@@ -372,6 +372,35 @@ class RendererApp {
   }
 
   /**
+   * 更新文件统计信息
+   */
+  private updateFileStats(): void {
+    const statsBadge = document.getElementById('fileStatsBadge');
+    if (!statsBadge) return;
+
+    const totalFiles = this.audioFiles.length;
+    const filteredCount = this.filteredFiles.length;
+    const downloadedCount = this.filteredFiles.filter(f => f.isDownloaded).length;
+
+    let statsText = '';
+    
+    if (this.filterDownloadStatus === 'all' && !this.filterText) {
+      // 显示总数
+      statsText = `<span class="stats-count">${totalFiles}</span> 个文件`;
+    } else {
+      // 显示过滤后的数量
+      statsText = `<span class="stats-count">${filteredCount}</span> / ${totalFiles} 个文件`;
+      
+      // 显示已下载数量
+      if (filteredCount > 0) {
+        statsText += ` <span class="stats-separator">·</span> <span class="stats-downloaded">${downloadedCount} 已下载</span>`;
+      }
+    }
+
+    statsBadge.innerHTML = statsText;
+  }
+
+  /**
    * 设置排序方式
    */
   private setSortBy(sortBy: 'title' | 'pubDate' | 'playCount' | 'duration'): void {
@@ -592,8 +621,11 @@ class RendererApp {
   private renderFilesList(): void {
     const filesList = document.getElementById('filesList') as HTMLDivElement;
     
+    // 更新文件统计
+    this.updateFileStats();
+    
     if (this.filteredFiles.length === 0) {
-      if (this.filterText) {
+      if (this.filterText || this.filterDownloadStatus !== 'all') {
         filesList.innerHTML = '<div class="empty-state"><p>没有找到匹配的文件</p></div>';
       } else {
         filesList.innerHTML = '<div class="empty-state"><p>未找到音频文件</p></div>';

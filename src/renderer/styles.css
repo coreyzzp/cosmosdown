@@ -74,6 +74,36 @@ body {
     margin-bottom: 0;
 }
 
+/* 文件统计徽章 */
+.file-stats-badge {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    white-space: nowrap;
+}
+
+.file-stats-badge .stats-count {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.file-stats-badge .stats-separator {
+    opacity: 0.6;
+    margin: 0 4px;
+}
+
+.file-stats-badge .stats-downloaded {
+    font-size: 12px;
+    opacity: 0.9;
+}
+
 /* 排序控制 */
 .sort-controls {
     display: flex;

@@ -18,6 +18,7 @@ export class CosmosDbService {
   private db: sqlite3.Database | null = null;
   private dbPath: string | null = null;
   private audioFilePath: string | null = null; // 音频文件目录路径
+  private fileNameCache: Map<string, string> | null = null; // 文件名前缀映射缓存
 
   /**
    * 设置音频文件路径
@@ -25,6 +26,96 @@ export class CosmosDbService {
   setAudioFilePath(audioFilePath: string): void {
     this.audioFilePath = audioFilePath;
     console.log(`音频文件路径已设置: ${audioFilePath}`);
+    // 清空缓存，以便重新扫描
+    this.fileNameCache = null;
+  }
+
+  /**
+   * 扫描音频目录，构建文件名前缀映射表
+   * 返回一个 Map：key为文件名前缀，value为完整文件名
+   */
+  private buildFileNameCache(audioDir: string): Map<string, string> {
+    if (this.fileNameCache) {
+      return this.fileNameCache;
+    }
+
+    const cache = new Map<string, string>();
+    
+    if (!fs.existsSync(audioDir)) {
+      console.warn(`音频目录不存在: ${audioDir}`);
+      return cache;
+    }
+
+    try {
+      const files = fs.readdirSync(audioDir);
+      console.log(`扫描音频目录，共 ${files.length} 个文件`);
+      
+      for (const fileName of files) {
+        // 跳过非音频文件
+        if (!fileName.match(/\.(m4a|mp3|wav|aac)$/i)) {
+          continue;
+        }
+        
+        // 移除扩展名，获取哈希部分
+        const nameWithoutExt = fileName.replace(/\.(m4a|mp3|wav|aac)$/i, '');
+        
+        // 遍历所有可能的前缀长度（从24个字符开始，这是MongoDB ObjectId的标准长度）
+        // 例如: 690c911eaf4fc00da774fdbd (24字符) 是前缀
+        // 完整文件名: 690c911eaf4fc00da774fdbdbcf6f872e9af5f80847714e132b788e8.m4a
+        for (let prefixLen = 20; prefixLen <= Math.min(32, nameWithoutExt.length); prefixLen++) {
+          const prefix = nameWithoutExt.substring(0, prefixLen);
+          
+          // 如果该前缀已存在，检查是否有更长的匹配
+          if (cache.has(prefix)) {
+            const existing = cache.get(prefix)!;
+            // 保留文件名更长的那个（更精确）
+            if (fileName.length > existing.length) {
+              cache.set(prefix, fileName);
+            }
+          } else {
+            cache.set(prefix, fileName);
+          }
+        }
+        
+        // 同时将完整的哈希名（不含扩展名）也作为key
+        cache.set(nameWithoutExt, fileName);
+      }
+      
+      console.log(`文件名缓存已构建，共 ${cache.size} 个前缀映射`);
+      this.fileNameCache = cache;
+      
+    } catch (error) {
+      console.error('构建文件名缓存失败:', error);
+    }
+    
+    return cache;
+  }
+
+  /**
+   * 根据单集ID（前缀）查找对应的完整文件名
+   */
+  private findFileByIdPrefix(episodeId: string, audioDir: string): string | null {
+    const cache = this.buildFileNameCache(audioDir);
+    
+    // 直接查找完整ID
+    if (cache.has(episodeId)) {
+      return cache.get(episodeId)!;
+    }
+    
+    // 尝试不同的前缀长度
+    for (let len = episodeId.length; len >= 20; len--) {
+      const prefix = episodeId.substring(0, len);
+      if (cache.has(prefix)) {
+        const fileName = cache.get(prefix)!;
+        // 验证文件名确实以该ID开头
+        const nameWithoutExt = fileName.replace(/\.(m4a|mp3|wav|aac)$/i, '');
+        if (nameWithoutExt.startsWith(episodeId)) {
+          return fileName;
+        }
+      }
+    }
+    
+    return null;
   }
 
   /**
@@ -391,44 +482,64 @@ export class CosmosDbService {
             let localFileSize = 0;
             let localFileFormat = '';
             
-            if (row.id) {
-              // 使用配置的音频文件路径或回退到旧的推测逻辑
-              let audioDir: string;
+            // 确定音频文件目录
+            let audioDir: string | null = null;
+            
+            if (this.audioFilePath) {
+              // 新逻辑：使用设置的音频文件路径 /Documents/AudioFile/{userId}
+              audioDir = this.audioFilePath;
+            } else if (this.dbPath) {
+              // 旧逻辑：从数据库路径推测
+              // 数据库路径: .../{userId}/db/cosmos.db
+              // 音频文件路径: .../AudioFile/{userId}
+              const userDir = path.dirname(path.dirname(this.dbPath)); // 上两级到用户目录
+              const documentsDir = path.dirname(userDir); // 再上一级到Documents
+              const userId = path.basename(userDir);
+              audioDir = path.join(documentsDir, 'AudioFile', userId);
+            }
+            
+            // 尝试查找本地文件
+            if (audioDir && row.id) {
+              // 方法1: 使用单集ID作为前缀查找（新方法）
+              const matchedFileName = this.findFileByIdPrefix(row.id, audioDir);
               
-              if (this.audioFilePath) {
-                // 新逻辑：使用设置的音频文件路径 /Documents/AudioFile/{userId}
-                audioDir = this.audioFilePath;
-              } else if (this.dbPath) {
-                // 旧逻辑：从数据库路径推测
-                // 数据库路径: .../{userId}/db/cosmos.db
-                // 音频文件路径: .../AudioFile/{userId}
-                const userDir = path.dirname(path.dirname(this.dbPath)); // 上两级到用户目录
-                const documentsDir = path.dirname(userDir); // 再上一级到Documents
-                const userId = path.basename(userDir);
-                audioDir = path.join(documentsDir, 'AudioFile', userId);
-              } else {
-                audioDir = '';
+              if (matchedFileName) {
+                const potentialPath = path.join(audioDir, matchedFileName);
+                
+                if (fs.existsSync(potentialPath)) {
+                  localPath = potentialPath;
+                  isDownloaded = true;
+                  
+                  // 从文件名提取扩展名
+                  const ext = path.extname(matchedFileName).slice(1);
+                  localFileFormat = ext || 'm4a';
+                  
+                  // 获取文件大小
+                  try {
+                    const stats = fs.statSync(potentialPath);
+                    localFileSize = stats.size;
+                  } catch (e) {
+                    console.error('获取文件大小失败:', e);
+                  }
+                }
               }
               
-              if (audioDir) {
-                // 尝试多种可能的文件扩展名
-                const possibleExtensions = ['m4a', 'mp3', 'wav', 'aac'];
+              // 方法2: 如果上面没找到，尝试使用数据库中的 audio_filename（回退方案）
+              if (!isDownloaded && row.audio_filename) {
+                const potentialPath = path.join(audioDir, row.audio_filename);
                 
-                for (const ext of possibleExtensions) {
-                  const potentialPath = path.join(audioDir, `${row.id}.${ext}`);
-                  if (fs.existsSync(potentialPath)) {
-                    localPath = potentialPath;
-                    isDownloaded = true;
-                    localFileFormat = ext;
-                    
-                    // 获取文件大小
-                    try {
-                      const stats = fs.statSync(potentialPath);
-                      localFileSize = stats.size;
-                    } catch (e) {
-                      console.error('获取文件大小失败:', e);
-                    }
-                    break;
+                if (fs.existsSync(potentialPath)) {
+                  localPath = potentialPath;
+                  isDownloaded = true;
+                  
+                  const ext = path.extname(row.audio_filename).slice(1);
+                  localFileFormat = ext || 'm4a';
+                  
+                  try {
+                    const stats = fs.statSync(potentialPath);
+                    localFileSize = stats.size;
+                  } catch (e) {
+                    console.error('获取文件大小失败:', e);
                   }
                 }
               }
