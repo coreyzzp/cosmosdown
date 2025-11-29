@@ -11,6 +11,9 @@ class RendererApp {
   private filterText = '';
   private filterDownloadStatus: 'all' | 'downloaded' | 'not-downloaded' = 'all';
   private currentDetailFile: any = null;
+  private readonly MAX_CONCURRENT_CONVERSIONS = 5;
+  private activeConversions: Set<string> = new Set();
+  private conversionQueue: Array<{fileId: string, file: any}> = [];
 
   constructor() {
     this.initializeApp();
@@ -31,6 +34,14 @@ class RendererApp {
       connectBtn.disabled = false;
       this.log(`已加载上次打开的数据库: ${lastDbPath}`, 'info');
     }
+    
+    // 加载上次选择的输出目录
+    const lastOutputPath = localStorage.getItem('lastOutputPath');
+    if (lastOutputPath) {
+      const outputPathInput = document.getElementById('outputPath') as HTMLInputElement;
+      outputPathInput.value = lastOutputPath;
+      this.log(`已加载上次的输出目录: ${lastOutputPath}`, 'info');
+    }
   }
 
   /**
@@ -38,6 +49,13 @@ class RendererApp {
    */
   private saveLastDatabase(dbPath: string): void {
     localStorage.setItem('lastDatabasePath', dbPath);
+  }
+  
+  /**
+   * 保存输出目录到本地存储
+   */
+  private saveLastOutputPath(outputPath: string): void {
+    localStorage.setItem('lastOutputPath', outputPath);
   }
 
   private initializeApp(): void {
@@ -183,6 +201,7 @@ class RendererApp {
       if (result.success && result.path) {
         const outputPathInput = document.getElementById('outputPath') as HTMLInputElement;
         outputPathInput.value = result.path;
+        this.saveLastOutputPath(result.path); // 保存输出目录
         this.log(`已选择输出目录: ${result.path}`);
         this.updateUI();
       }
@@ -681,7 +700,6 @@ class RendererApp {
             <span class="stat" title="文件大小">💾 ${fileSize}</span>
           </div>
         </div>
-        <div class="file-status pending" id="status-${file.id}">待处理</div>
       </div>
     `;
     }).join('');
@@ -817,7 +835,15 @@ class RendererApp {
       task.progress = 100;
       this.renderConversionList();
     }
+    
+    // 从活动转换集合中移除
+    this.activeConversions.delete(taskId);
+    
     this.log(`转换完成: ${result}`, 'success');
+    
+    // 处理队列中的下一个任务
+    const outputPath = (document.getElementById('outputPath') as HTMLInputElement).value.trim();
+    this.processConversionQueue(outputPath);
   }
 
   private handleConversionFailed(taskId: string, error: string): void {
@@ -827,7 +853,15 @@ class RendererApp {
       task.progress = 0;
       this.renderConversionList();
     }
+    
+    // 从活动转换集合中移除
+    this.activeConversions.delete(taskId);
+    
     this.log(`转换失败: ${error}`, 'error');
+    
+    // 处理队列中的下一个任务
+    const outputPath = (document.getElementById('outputPath') as HTMLInputElement).value.trim();
+    this.processConversionQueue(outputPath);
   }
 
   /**
@@ -852,21 +886,38 @@ class RendererApp {
       return;
     }
 
-    try {
-      // 显示转换面板
-      this.showProgressSection(true);
-      
-      // 添加到转换列表
-      this.conversionTasks.set(fileId, {
-        id: fileId,
-        title: file.title,
-        status: 'pending',
-        progress: 0
-      });
-      this.renderConversionList();
-      
-      this.log(`开始转换: ${file.title}`, 'info');
+    // 显示转换面板
+    this.showProgressSection(true);
+    
+    // 添加到转换列表
+    this.conversionTasks.set(fileId, {
+      id: fileId,
+      title: file.title,
+      status: 'pending',
+      progress: 0
+    });
+    this.renderConversionList();
+    
+    // 检查并行转换限制
+    if (this.activeConversions.size >= this.MAX_CONCURRENT_CONVERSIONS) {
+      this.conversionQueue.push({ fileId, file });
+      this.updateConversionTask(fileId, 'pending', 0);
+      this.log(`转换任务已加入队列 (${this.conversionQueue.length} 个等待): ${file.title}`, 'info');
+      return;
+    }
+    
+    // 开始转换
+    await this.startConversionTask(fileId, file, outputPath);
+  }
+  
+  /**
+   * 开始转换任务
+   */
+  private async startConversionTask(fileId: string, file: any, outputPath: string): Promise<void> {
+    this.activeConversions.add(fileId);
+    this.log(`开始转换 (${this.activeConversions.size}/${this.MAX_CONCURRENT_CONVERSIONS}): ${file.title}`, 'info');
 
+    try {
       const message: RendererToMainMessage = {
         type: 'start-conversion',
         payload: {
@@ -878,14 +929,37 @@ class RendererApp {
       const result = await window.electronAPI.sendMessage(message);
       if (result.success) {
         this.updateConversionTask(fileId, 'converting', 0);
-        this.log(`转换任务已启动: ${file.title}`, 'success');
       } else {
         throw new Error(result.error || '启动转换失败');
       }
     } catch (error: any) {
       this.log(`启动转换失败: ${error.message}`, 'error');
       this.updateConversionTask(fileId, 'failed', 0);
+      this.activeConversions.delete(fileId);
+      this.processConversionQueue(outputPath);
     }
+  }
+  
+  /**
+   * 处理转换队列
+   */
+  private processConversionQueue(outputPath: string): void {
+    if (this.conversionQueue.length > 0 && this.activeConversions.size < this.MAX_CONCURRENT_CONVERSIONS) {
+      const next = this.conversionQueue.shift();
+      if (next) {
+        this.log(`从队列中取出下一个任务: ${next.file.title}`, 'info');
+        this.startConversionTask(next.fileId, next.file, outputPath);
+      }
+    }
+  }
+  
+  /**
+   * 删除转换任务
+   */
+  private removeConversionTask(taskId: string): void {
+    this.conversionTasks.delete(taskId);
+    this.renderConversionList();
+    this.log(`已删除转换记录`, 'info');
   }
 
   /**
@@ -913,7 +987,7 @@ class RendererApp {
 
     const tasksHtml = Array.from(this.conversionTasks.values()).map(task => {
       const statusText = {
-        'pending': '等待中',
+        'pending': `等待中 (队列: ${this.conversionQueue.findIndex(q => q.fileId === task.id) + 1})`,
         'converting': '转换中',
         'completed': '已完成',
         'failed': '失败'
@@ -923,7 +997,11 @@ class RendererApp {
         <div class="conversion-item ${task.status}">
           <div class="conversion-header">
             <div class="conversion-title">${this.escapeHtml(task.title)}</div>
-            <div class="conversion-status ${task.status}">${statusText}</div>
+            <div class="conversion-actions">
+              <div class="conversion-status ${task.status}">${statusText}</div>
+              ${task.status === 'completed' || task.status === 'failed' ? 
+                `<button class="delete-task-btn" data-task-id="${task.id}" title="删除记录">🗑️</button>` : ''}
+            </div>
           </div>
           ${task.status === 'converting' ? `
             <div class="conversion-progress">
@@ -938,6 +1016,26 @@ class RendererApp {
     }).join('');
 
     conversionList.innerHTML = tasksHtml;
+    
+    // 添加删除按钮事件监听
+    const deleteButtons = conversionList.querySelectorAll('.delete-task-btn') as NodeListOf<HTMLButtonElement>;
+    deleteButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const taskId = btn.dataset.taskId!;
+        this.removeConversionTask(taskId);
+      });
+    });
+    
+    // 显示队列信息
+    if (this.conversionQueue.length > 0 || this.activeConversions.size > 0) {
+      const queueInfo = document.createElement('div');
+      queueInfo.className = 'queue-info';
+      queueInfo.innerHTML = `
+        <span>⚡ 正在转换: ${this.activeConversions.size}/${this.MAX_CONCURRENT_CONVERSIONS}</span>
+        ${this.conversionQueue.length > 0 ? `<span>📋 队列等待: ${this.conversionQueue.length}</span>` : ''}
+      `;
+      conversionList.insertBefore(queueInfo, conversionList.firstChild);
+    }
   }
 
   private showProgressSection(show: boolean): void {

@@ -585,6 +585,7 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
+    gap: 12px;
 }
 
 .conversion-title {
@@ -593,11 +594,18 @@ body {
     flex: 1;
 }
 
+.conversion-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .conversion-status {
     padding: 4px 12px;
     border-radius: 12px;
     font-size: 11px;
     font-weight: 600;
+    white-space: nowrap;
 }
 
 .conversion-status.pending {
@@ -618,6 +626,47 @@ body {
 .conversion-status.failed {
     background: #f8d7da;
     color: #721c24;
+}
+
+/* 删除任务按钮 */
+.delete-task-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.delete-task-btn:hover {
+    background: #dc3545;
+    border-color: #dc3545;
+    transform: scale(1.1);
+}
+
+/* 队列信息 */
+.queue-info {
+    display: flex;
+    gap: 16px;
+    padding: 12px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.queue-info span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .conversion-progress {
@@ -683,6 +732,7 @@ body {
     right: 16px;
     font-size: 20px;
     opacity: 0.6;
+    pointer-events: none;
 }
 
 .file-item:hover {
