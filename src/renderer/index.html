@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniUBrowser - 音频文件转换器</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <header class="app-header">
+            <h1>🎵 MiniUBrowser</h1>
+            <p>SQLite数据库音频文件转换工具</p>
+        </header>
+
+        <main class="app-main">
+            <!-- 数据库连接区域 -->
+            <section class="section database-section">
+                <h2>📁 数据库连接</h2>
+                <div class="input-group">
+                    <input type="text" id="dbPath" placeholder="选择SQLite数据库文件..." readonly>
+                    <button id="selectDbBtn" class="btn btn-primary">选择数据库</button>
+                    <button id="connectBtn" class="btn btn-success" disabled>连接</button>
+                </div>
+                <div id="dbStatus" class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">未连接</span>
+                </div>
+            </section>
+
+            <!-- 输出目录设置 -->
+            <section class="section output-section">
+                <h2>📂 输出设置</h2>
+                <div class="input-group">
+                    <input type="text" id="outputPath" placeholder="选择输出目录..." readonly>
+                    <button id="selectOutputBtn" class="btn btn-primary">选择目录</button>
+                </div>
+                <div class="quality-settings">
+                    <label for="audioQuality">音频质量:</label>
+                    <select id="audioQuality">
+                        <option value="low">低质量 (128kbps)</option>
+                        <option value="medium" selected>中等质量 (192kbps)</option>
+                        <option value="high">高质量 (320kbps)</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- 文件列表区域 -->
+            <section class="section files-section">
+                <div class="section-header">
+                    <h2>🎼 音频文件列表</h2>
+                    <button id="refreshBtn" class="btn btn-secondary" disabled>刷新列表</button>
+                </div>
+                <div id="filesList" class="files-list">
+                    <div class="empty-state">
+                        <p>请先连接数据库以查看音频文件</p>
+                    </div>
+                </div>
+                <div class="files-actions">
+                    <button id="selectAllBtn" class="btn btn-secondary" disabled>全选</button>
+                    <button id="deselectAllBtn" class="btn btn-secondary" disabled>取消全选</button>
+                    <button id="startConversionBtn" class="btn btn-success" disabled>开始转换</button>
+                </div>
+            </section>
+
+            <!-- 转换进度区域 -->
+            <section class="section progress-section" style="display: none;">
+                <h2>⚡ 转换进度</h2>
+                <div id="progressContainer">
+                    <!-- 动态生成的进度条 -->
+                </div>
+                <div class="overall-progress">
+                    <label>总体进度:</label>
+                    <div class="progress-bar">
+                        <div id="overallProgress" class="progress-fill"></div>
+                    </div>
+                    <span id="overallProgressText">0%</span>
+                </div>
+            </section>
+
+            <!-- 日志区域 -->
+            <section class="section log-section">
+                <h2>📋 操作日志</h2>
+                <div id="logContainer" class="log-container">
+                    <div class="log-entry">
+                        <span class="log-time">[启动]</span>
+                        <span class="log-message">应用已启动，等待操作...</span>
+                    </div>
+                </div>
+                <button id="clearLogBtn" class="btn btn-secondary">清空日志</button>
+            </section>
+        </main>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
