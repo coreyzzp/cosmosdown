@@ -206,6 +206,15 @@ class RendererApp {
         this.updateUI();
       }
     });
+    
+    // 输出路径变化时自动保存
+    const outputPathInput = document.getElementById('outputPath') as HTMLInputElement;
+    outputPathInput.addEventListener('change', () => {
+      const path = outputPathInput.value.trim();
+      if (path) {
+        this.saveLastOutputPath(path);
+      }
+    });
 
     // 刷新文件列表按钮
     const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
@@ -674,15 +683,22 @@ class RendererApp {
         badges.push(`<span class="badge badge-progress">▶️ ${file.progressPercent}%</span>`);
       }
 
+      // 获取封面图URL（优先使用单集封面，否则使用播客封面）
+      const coverUrl = file.image || file.podcastImage;
+
       return `
       <div class="file-item ${file.isDownloaded ? 'downloaded' : ''}">
         <input type="checkbox" class="file-checkbox" data-file-id="${file.id}" 
                ${this.selectedFiles.has(file.id?.toString()) ? 'checked' : ''}>
-        ${file.image || file.podcastImage ? `
+        ${coverUrl ? `
         <div class="file-cover">
-          <img src="${file.image || file.podcastImage}" alt="封面" onerror="this.style.display='none'">
+          <img src="${this.escapeHtml(coverUrl)}" alt="封面" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/%3E%3Ctext fill=%22%23999%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22%3E🎵%3C/text%3E%3C/svg%3E';">
         </div>
-        ` : ''}
+        ` : `
+        <div class="file-cover">
+          <img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/%3E%3Ctext fill=%22%23999%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22%3E🎵%3C/text%3E%3C/svg%3E" alt="默认封面">
+        </div>
+        `}
         <div class="file-info">
           <div class="file-title">
             ${this.escapeHtml(file.title || '未命名单集')}
@@ -795,26 +811,52 @@ class RendererApp {
       this.log('请选择要转换的文件', 'error');
       return;
     }
+    
+    // 保存输出目录
+    this.saveLastOutputPath(outputPath);
 
-    const selectedFilePaths = this.audioFiles
-      .filter(file => this.selectedFiles.has(file.id.toString()))
-      .map(file => file.originalPath);
+    const selectedFiles = this.audioFiles.filter(file => 
+      this.selectedFiles.has(file.id.toString())
+    );
+    
+    // 检查是否有未下载的文件
+    const notDownloaded = selectedFiles.filter(f => !f.isDownloaded);
+    if (notDownloaded.length > 0) {
+      this.log(`警告: ${notDownloaded.length} 个文件未下载，将被跳过`, 'error');
+    }
+    
+    const downloadedFiles = selectedFiles.filter(f => f.isDownloaded);
+    if (downloadedFiles.length === 0) {
+      this.log('没有可转换的文件（所有选中的文件都未下载）', 'error');
+      return;
+    }
 
     try {
       this.showProgressSection(true);
-      this.log(`开始转换 ${selectedFilePaths.length} 个文件...`, 'info');
+      this.log(`开始批量转换 ${downloadedFiles.length} 个文件...`, 'info');
+      
+      // 为每个文件创建转换任务
+      downloadedFiles.forEach(file => {
+        this.conversionTasks.set(file.id, {
+          id: file.id,
+          title: file.title,
+          status: 'pending',
+          progress: 0
+        });
+      });
+      this.renderConversionList();
 
       const message: RendererToMainMessage = {
-        type: 'start-conversion',
+        type: 'batch-conversion',
         payload: {
-          files: selectedFilePaths,
+          fileIds: downloadedFiles.map(f => f.id),
           outputDir: outputPath
         }
       };
 
       const result = await window.electronAPI.sendMessage(message);
       if (result.success) {
-        this.log('转换任务已启动', 'success');
+        this.log(`批量转换任务已启动，共 ${result.converted} 个文件`, 'success');
       } else {
         throw new Error(result.error || '启动转换失败');
       }
@@ -879,6 +921,9 @@ class RendererApp {
       this.log('请先选择输出目录', 'error');
       return;
     }
+    
+    // 保存输出目录
+    this.saveLastOutputPath(outputPath);
 
     const file = this.audioFiles.find(f => f.id === fileId);
     if (!file) {

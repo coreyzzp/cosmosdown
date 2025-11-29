@@ -9,7 +9,13 @@
     "dev": "npm run build && electron dist/main.js",
     "start": "electron dist/main.js",
     "pack": "npm run build && electron-builder",
+    "pack:mac": "npm run build && electron-builder --mac",
+    "pack:win": "npm run build && electron-builder --win",
+    "pack:linux": "npm run build && electron-builder --linux",
     "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
     "test": "jest",
     "clean": "rimraf dist release",
     "create-sample-db": "node scripts/create-sample-db.js"
@@ -46,13 +52,33 @@
     ],
     "mac": {
       "category": "public.app-category.utilities",
-      "target": "dmg"
+      "target": ["dmg", "zip"],
+      "icon": "assert/icon.png",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "icon": "assert/icon.png"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assert/icon.png"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "assert/icon.png"
     }
   }
 }

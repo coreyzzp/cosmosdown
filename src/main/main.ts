@@ -303,18 +303,55 @@ class MainProcess {
             payload: { total: filesToConvert.length }
           });
           
-          // 逐个转换
+          // 为每个文件设置独立的回调并启动转换
           for (const file of filesToConvert) {
             const safeTitle = this.sanitizeFilename(file.title || file.id);
             const outputFilename = `${safeTitle}.mp3`;
+            const outputPath = path.join(outputDir, outputFilename);
+            
+            // 准备元数据
+            const metadata = {
+              title: file.title,
+              artist: file.podcastAuthor || file.podcastTitle,
+              album: file.podcastTitle,
+              comment: file.description || '',
+              coverUrl: file.image || file.podcastImage
+            };
             
             try {
+              // 为每个任务设置独立的回调（关键修复）
+              this.audioProcessor.setTaskCallbacks(file.id, {
+                onProgress: (progress: number) => {
+                  const response: MainToRendererMessage = {
+                    type: 'task-progress',
+                    payload: { taskId: file.id, progress }
+                  };
+                  this.mainWindow?.webContents.send('main-message', response);
+                },
+                onComplete: (result: string) => {
+                  const response: MainToRendererMessage = {
+                    type: 'task-completed',
+                    payload: { taskId: file.id, result: outputPath }
+                  };
+                  this.mainWindow?.webContents.send('main-message', response);
+                },
+                onError: (error: string) => {
+                  const response: MainToRendererMessage = {
+                    type: 'task-failed',
+                    payload: { taskId: file.id, error }
+                  };
+                  this.mainWindow?.webContents.send('main-message', response);
+                }
+              });
+              
+              // 启动转换（带元数据，不等待完成，让AudioProcessor并行处理）
               await this.audioProcessor.convertFiles(
                 [file.localPath!], 
                 outputDir, 
                 this.appConfig,
                 file.id,
-                outputFilename
+                outputFilename,
+                metadata
               );
             } catch (error: any) {
               console.error(`转换失败 ${file.title}:`, error);
