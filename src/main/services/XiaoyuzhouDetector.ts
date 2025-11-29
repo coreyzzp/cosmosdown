@@ -23,7 +23,7 @@ export interface XiaoyuzhouAppInfo {
 export class XiaoyuzhouDetector {
   private readonly CONTAINER_BASE_PATH: string;
   private readonly KNOWN_CONTAINER_IDS = [
-    '8A51F41B-4985-4AD1-B6C2-384D6EC1A651', // 小宇宙已知的容器ID
+    // '8A51F41B-4985-4AD1-B6C2-384D6EC1A651', // 小宇宙已知的容器ID
   ];
 
   constructor() {

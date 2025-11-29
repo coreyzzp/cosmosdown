@@ -27,6 +27,14 @@
 npm install
 ```
 
+安装后会自动重新编译原生模块（sqlite3）以匹配 Electron 版本。
+
+如果遇到启动问题，可以手动重新编译：
+
+```bash
+npm run rebuild
+```
+
 ## 开发模式
 
 ```bash
@@ -152,16 +160,18 @@ sudo spctl --master-disable
 
 ### 3. 原生模块编译失败
 
-**问题：** `sqlite3` 等原生模块编译失败。
+**问题：** `sqlite3` 等原生模块编译失败，或启动时提示 "Could not locate the bindings file"。
 
 **解决方案：**
 ```bash
 # 重新构建原生模块
-npm run electron-rebuild
+npm run rebuild
 
 # 或手动重建
-./node_modules/.bin/electron-rebuild
+npx electron-rebuild -f -w sqlite3
 ```
+
+**注意：** 如果更新了 Electron 版本或 Node.js 版本，必须重新编译原生模块。
 
 ### 4. 打包体积过大
 

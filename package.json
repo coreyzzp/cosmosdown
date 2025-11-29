@@ -6,6 +6,8 @@
   "scripts": {
     "build": "node scripts/esbuild.config.js",
     "build:old": "node scripts/build.js",
+    "rebuild": "electron-rebuild -f -w sqlite3",
+    "postinstall": "electron-rebuild -f -w sqlite3",
     "dev": "npm run build && electron dist/main.js",
     "start": "electron dist/main.js",
     "pack": "npm run build && electron-builder",
@@ -52,7 +54,10 @@
     ],
     "mac": {
       "category": "public.app-category.utilities",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assert/icon.png",
       "hardenedRuntime": false,
       "gatekeeperAssess": false
