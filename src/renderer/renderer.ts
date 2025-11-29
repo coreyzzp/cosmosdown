@@ -678,6 +678,11 @@ class RendererApp {
       <div class="file-item ${file.isDownloaded ? 'downloaded' : ''}">
         <input type="checkbox" class="file-checkbox" data-file-id="${file.id}" 
                ${this.selectedFiles.has(file.id?.toString()) ? 'checked' : ''}>
+        ${file.image || file.podcastImage ? `
+        <div class="file-cover">
+          <img src="${file.image || file.podcastImage}" alt="封面" onerror="this.style.display='none'">
+        </div>
+        ` : ''}
         <div class="file-info">
           <div class="file-title">
             ${this.escapeHtml(file.title || '未命名单集')}

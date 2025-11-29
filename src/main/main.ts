@@ -229,40 +229,48 @@ class MainProcess {
           const outputFilename = `${safeTitle}.mp3`;
           const outputPath = path.join(outputDir, outputFilename);
           
-          // 设置进度回调
-          this.audioProcessor.onProgress = (taskId: string, progress: number) => {
-            const response: MainToRendererMessage = {
-              type: 'task-progress',
-              payload: { taskId: fileId, progress }
-            };
-            this.mainWindow?.webContents.send('main-message', response);
+          // 准备元数据
+          const metadata = {
+            title: file.title,
+            artist: file.podcastAuthor || file.podcastTitle,
+            album: file.podcastTitle,
+            comment: file.description || '',
+            coverUrl: file.image || file.podcastImage
           };
+          
+          // 为该任务设置独立的回调
+          this.audioProcessor.setTaskCallbacks(fileId, {
+            onProgress: (progress: number) => {
+              const response: MainToRendererMessage = {
+                type: 'task-progress',
+                payload: { taskId: fileId, progress }
+              };
+              this.mainWindow?.webContents.send('main-message', response);
+            },
+            onComplete: (result: string) => {
+              const response: MainToRendererMessage = {
+                type: 'task-completed',
+                payload: { taskId: fileId, result: outputPath }
+              };
+              this.mainWindow?.webContents.send('main-message', response);
+            },
+            onError: (error: string) => {
+              const response: MainToRendererMessage = {
+                type: 'task-failed',
+                payload: { taskId: fileId, error }
+              };
+              this.mainWindow?.webContents.send('main-message', response);
+            }
+          });
 
-          // 设置完成回调
-          this.audioProcessor.onComplete = (taskId: string, result: string) => {
-            const response: MainToRendererMessage = {
-              type: 'task-completed',
-              payload: { taskId: fileId, result: outputPath }
-            };
-            this.mainWindow?.webContents.send('main-message', response);
-          };
-
-          // 设置错误回调
-          this.audioProcessor.onError = (taskId: string, error: string) => {
-            const response: MainToRendererMessage = {
-              type: 'task-failed',
-              payload: { taskId: fileId, error }
-            };
-            this.mainWindow?.webContents.send('main-message', response);
-          };
-
-          // 开始转换
+          // 开始转换（带元数据）
           const result = await this.audioProcessor.convertFiles(
             [file.localPath], 
             outputDir, 
             this.appConfig,
             fileId,
-            outputFilename
+            outputFilename,
+            metadata
           );
           
           return { success: true, result, outputPath };

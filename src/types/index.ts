@@ -26,6 +26,13 @@ export interface ConversionTask {
   error?: string;
   createdAt: Date;
   completedAt?: Date;
+  metadata?: {
+    title?: string;
+    artist?: string;
+    album?: string;
+    comment?: string;
+    coverUrl?: string;
+  };
 }
 
 // 应用配置接口
