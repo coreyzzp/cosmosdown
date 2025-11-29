@@ -54,20 +54,29 @@ export class AudioProcessor {
   async convertFiles(
     filePaths: string[], 
     outputDirectory: string, 
-    config: AppConfig
+    config: AppConfig,
+    customTaskId?: string,
+    customOutputFilename?: string
   ): Promise<ConversionTask[]> {
     // 确保输出目录存在
     await this.ensureDirectoryExists(outputDirectory);
 
     // 创建转换任务
-    const tasks: ConversionTask[] = filePaths.map(filePath => ({
-      id: randomUUID(),
-      sourceFile: filePath,
-      targetFile: this.generateOutputPath(filePath, outputDirectory),
-      status: 'pending',
-      progress: 0,
-      createdAt: new Date()
-    }));
+    const tasks: ConversionTask[] = filePaths.map(filePath => {
+      const taskId = customTaskId || randomUUID();
+      const targetFile = customOutputFilename 
+        ? path.join(outputDirectory, customOutputFilename)
+        : this.generateOutputPath(filePath, outputDirectory);
+      
+      return {
+        id: taskId,
+        sourceFile: filePath,
+        targetFile,
+        status: 'pending',
+        progress: 0,
+        createdAt: new Date()
+      };
+    });
 
     // 添加到任务队列
     this.taskQueue.push(...tasks);

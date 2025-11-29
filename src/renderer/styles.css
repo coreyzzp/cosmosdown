@@ -238,6 +238,51 @@ body {
     cursor: not-allowed;
 }
 
+/* 下载状态过滤栏 */
+.download-filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: center;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.download-filter-bar .filter-label {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-right: 8px;
+}
+
+.btn-filter {
+    padding: 6px 16px;
+    border: 2px solid #e1e8ed;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    background: white;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-filter:hover {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.btn-filter.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-color: #667eea;
+}
+
+.btn-filter:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* 自定义Tooltip */
 .custom-tooltip {
     position: fixed;
@@ -454,6 +499,120 @@ body {
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
+/* 转换按钮 */
+.convert-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #56ab2f, #a8e6cf);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+}
+
+.convert-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(86, 171, 47, 0.4);
+}
+
+.convert-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #6c757d;
+}
+
+/* 转换列表 */
+.conversion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.conversion-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+    border-left: 4px solid #667eea;
+}
+
+.conversion-item.converting {
+    border-left-color: #ffc107;
+}
+
+.conversion-item.completed {
+    border-left-color: #28a745;
+}
+
+.conversion-item.failed {
+    border-left-color: #dc3545;
+}
+
+.conversion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.conversion-title {
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+}
+
+.conversion-status {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.conversion-status.pending {
+    background: #e9ecef;
+    color: #6c757d;
+}
+
+.conversion-status.converting {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.conversion-status.completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.conversion-status.failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.conversion-progress {
+    margin-top: 8px;
+}
+
+.conversion-progress-bar {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.conversion-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #56ab2f, #a8e6cf);
+    transition: width 0.3s ease;
+}
+
+.conversion-info {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
 /* 文件列表 */
 .files-list {
     max-height: 400px;
@@ -475,13 +634,34 @@ body {
     align-items: flex-start;
     padding: 16px;
     border-bottom: 1px solid #f1f3f4;
-    transition: background-color 0.2s ease, transform 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease, border-left 0.2s ease;
     cursor: pointer;
+    border-left: 4px solid transparent;
+    position: relative;
+}
+
+/* 已下载文件的特殊样式 */
+.file-item.downloaded {
+    border-left-color: #28a745;
+    background: linear-gradient(90deg, rgba(40, 167, 69, 0.05) 0%, transparent 100%);
+}
+
+.file-item.downloaded::before {
+    content: '💾';
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 20px;
+    opacity: 0.6;
 }
 
 .file-item:hover {
     background-color: #f8f9fa;
     transform: translateX(4px);
+}
+
+.file-item.downloaded:hover {
+    background: linear-gradient(90deg, rgba(40, 167, 69, 0.1) 0%, #f8f9fa 100%);
 }
 
 .file-item:last-child {

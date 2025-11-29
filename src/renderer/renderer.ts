@@ -1,14 +1,15 @@
-import { MainToRendererMessage, RendererToMainMessage, AudioFileInfo, ConversionTask } from '../types';
+import { MainToRendererMessage, RendererToMainMessage } from '../types';
 
 class RendererApp {
   private selectedFiles: Set<string> = new Set();
   private audioFiles: any[] = [];
   private filteredFiles: any[] = [];
-  private conversionTasks: Map<string, ConversionTask> = new Map();
+  private conversionTasks: Map<string, any> = new Map();
   private isConnected = false;
   private sortBy: 'title' | 'pubDate' | 'playCount' | 'duration' = 'pubDate';
   private sortOrder: 'asc' | 'desc' = 'desc';
   private filterText = '';
+  private filterDownloadStatus: 'all' | 'downloaded' | 'not-downloaded' = 'all';
   private currentDetailFile: any = null;
 
   constructor() {
@@ -42,6 +43,7 @@ class RendererApp {
   private initializeApp(): void {
     this.log('应用初始化完成');
     this.updateUI();
+    this.updateDownloadFilterButtons();
   }
 
   private setupEventListeners(): void {
@@ -86,6 +88,29 @@ class RendererApp {
         this.applyFilter();
         clearFilterBtn.disabled = true;
       }
+    });
+
+    // 下载状态过滤
+    const downloadFilterAll = document.getElementById('downloadFilterAll') as HTMLButtonElement;
+    const downloadFilterDownloaded = document.getElementById('downloadFilterDownloaded') as HTMLButtonElement;
+    const downloadFilterNotDownloaded = document.getElementById('downloadFilterNotDownloaded') as HTMLButtonElement;
+
+    downloadFilterAll?.addEventListener('click', () => {
+      this.filterDownloadStatus = 'all';
+      this.updateDownloadFilterButtons();
+      this.applyFilter();
+    });
+
+    downloadFilterDownloaded?.addEventListener('click', () => {
+      this.filterDownloadStatus = 'downloaded';
+      this.updateDownloadFilterButtons();
+      this.applyFilter();
+    });
+
+    downloadFilterNotDownloaded?.addEventListener('click', () => {
+      this.filterDownloadStatus = 'not-downloaded';
+      this.updateDownloadFilterButtons();
+      this.applyFilter();
     });
 
     // 排序按钮监听
@@ -204,7 +229,20 @@ class RendererApp {
     window.electronAPI.onMessage((message: MainToRendererMessage) => {
       switch (message.type) {
         case 'database-connected':
-          this.log(`数据库已连接: ${message.payload.path}`, 'success');
+          if (message.payload.autoConnected) {
+            this.log(`🎉 自动检测到小宇宙应用！`, 'success');
+            if (message.payload.appInfo) {
+              this.log(`容器ID: ${message.payload.appInfo.containerId}`, 'info');
+              this.log(`用户ID: ${message.payload.appInfo.userId}`, 'info');
+              this.log(`音频目录: ${message.payload.appInfo.audioFilePath}`, 'info');
+            }
+            this.isConnected = true;
+            this.updateConnectionStatus(true, message.payload.path);
+            // 自动加载文件
+            setTimeout(() => this.loadFiles(), 500);
+          } else {
+            this.log(`数据库已连接: ${message.payload.path}`, 'success');
+          }
           break;
 
         case 'files-found':
@@ -214,15 +252,15 @@ class RendererApp {
           break;
 
         case 'task-progress':
-          this.updateTaskProgress(message.payload.taskId, message.payload.progress);
+          this.updateConversionProgress(message.payload.taskId, message.payload.progress);
           break;
 
         case 'task-completed':
-          this.handleTaskCompleted(message.payload.taskId, message.payload.result);
+          this.handleConversionCompleted(message.payload.taskId, message.payload.result);
           break;
 
         case 'task-failed':
-          this.handleTaskFailed(message.payload.taskId, message.payload.error);
+          this.handleConversionFailed(message.payload.taskId, message.payload.error);
           break;
       }
     });
@@ -246,11 +284,20 @@ class RendererApp {
         this.applyFilter(); // 应用过滤
         this.log(`加载了 ${this.audioFiles.length} 个音频文件`, 'info');
         
-        // 启用过滤输入框
+        // 启用过滤输入框和下载状态过滤按钮
         const filterInput = document.getElementById('filterInput') as HTMLInputElement;
         if (filterInput) {
           filterInput.disabled = false;
         }
+        
+        const downloadFilterButtons = [
+          document.getElementById('downloadFilterAll'),
+          document.getElementById('downloadFilterDownloaded'),
+          document.getElementById('downloadFilterNotDownloaded')
+        ];
+        downloadFilterButtons.forEach(btn => {
+          if (btn) (btn as HTMLButtonElement).disabled = false;
+        });
       } else {
         throw new Error(result.error || '加载文件失败');
       }
@@ -263,11 +310,12 @@ class RendererApp {
    * 应用过滤
    */
   private applyFilter(): void {
-    if (!this.filterText) {
-      this.filteredFiles = this.audioFiles;
-    } else {
+    let filtered = this.audioFiles;
+
+    // 应用文本搜索过滤
+    if (this.filterText) {
       const searchTerm = this.filterText.toLowerCase();
-      this.filteredFiles = this.audioFiles.filter(file => {
+      filtered = filtered.filter(file => {
         const title = (file.title || '').toLowerCase();
         const podcastTitle = (file.podcastTitle || '').toLowerCase();
         const podcastAuthor = (file.podcastAuthor || '').toLowerCase();
@@ -279,12 +327,48 @@ class RendererApp {
                description.includes(searchTerm);
       });
     }
-    
+
+    // 应用下载状态过滤
+    if (this.filterDownloadStatus === 'downloaded') {
+      filtered = filtered.filter(file => file.isDownloaded === true);
+    } else if (this.filterDownloadStatus === 'not-downloaded') {
+      filtered = filtered.filter(file => !file.isDownloaded);
+    }
+
+    this.filteredFiles = filtered;
     this.renderFilesList();
     
-    if (this.filterText) {
-      this.log(`过滤结果: ${this.filteredFiles.length} / ${this.audioFiles.length} 个文件`, 'info');
+    // 显示过滤统计
+    const filters = [];
+    if (this.filterText) filters.push(`搜索"${this.filterText}"`);
+    if (this.filterDownloadStatus !== 'all') {
+      filters.push(this.filterDownloadStatus === 'downloaded' ? '已下载' : '未下载');
     }
+    
+    if (filters.length > 0) {
+      this.log(`过滤结果 (${filters.join(', ')}): ${this.filteredFiles.length} / ${this.audioFiles.length} 个文件`, 'info');
+    }
+  }
+
+  /**
+   * 更新下载状态过滤按钮
+   */
+  private updateDownloadFilterButtons(): void {
+    const buttons = {
+      'all': document.getElementById('downloadFilterAll'),
+      'downloaded': document.getElementById('downloadFilterDownloaded'),
+      'not-downloaded': document.getElementById('downloadFilterNotDownloaded')
+    };
+
+    Object.entries(buttons).forEach(([key, btn]) => {
+      if (btn) {
+        if (key === this.filterDownloadStatus) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      }
+    });
   }
 
   /**
@@ -540,17 +624,19 @@ class RendererApp {
       }
 
       return `
-      <div class="file-item">
+      <div class="file-item ${file.isDownloaded ? 'downloaded' : ''}">
         <input type="checkbox" class="file-checkbox" data-file-id="${file.id}" 
                ${this.selectedFiles.has(file.id?.toString()) ? 'checked' : ''}>
         <div class="file-info">
           <div class="file-title">
             ${this.escapeHtml(file.title || '未命名单集')}
             <button class="info-btn" data-file-id="${file.id}" title="查看详细信息">ℹ</button>
+            ${file.isDownloaded ? `<button class="convert-btn" data-file-id="${file.id}" title="转换为MP3">🔄 转换</button>` : ''}
           </div>
           <div class="file-meta">
             <span class="podcast-title">${this.escapeHtml(file.podcastTitle || '未知播客')}</span>
             ${file.podcastAuthor ? `<span class="podcast-author">· ${this.escapeHtml(file.podcastAuthor)}</span>` : ''}
+            ${file.isDownloaded ? `<span class="local-file-info"> | 本地: ${this.escapeHtml(file.localFileFormat.toUpperCase())} ${this.formatFileSize(file.localFileSize)}</span>` : ''}
           </div>
           <div class="file-badges">
             ${badges.join(' ')}
@@ -580,6 +666,16 @@ class RendererApp {
         if (file) {
           this.showDetailsPanel(file);
         }
+      });
+    });
+
+    // 设置转换按钮点击事件
+    const convertButtons = filesList.querySelectorAll('.convert-btn') as NodeListOf<HTMLButtonElement>;
+    convertButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const fileId = btn.dataset.fileId!;
+        this.convertFile(fileId);
       });
     });
 
@@ -673,81 +769,143 @@ class RendererApp {
     }
   }
 
-  private updateTaskProgress(taskId: string, progress: number): void {
-    // 更新单个任务进度
-    let progressElement = document.getElementById(`progress-${taskId}`);
-    if (!progressElement) {
-      const progressContainer = document.getElementById('progressContainer') as HTMLDivElement;
-      progressElement = document.createElement('div');
-      progressElement.className = 'task-progress';
-      progressElement.id = `progress-${taskId}`;
-      progressElement.innerHTML = `
-        <div class="task-name">${taskId}</div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="fill-${taskId}"></div>
+  private updateConversionProgress(taskId: string, progress: number): void {
+    const task = this.conversionTasks.get(taskId);
+    if (task) {
+      task.status = 'converting';
+      task.progress = progress;
+      this.renderConversionList();
+    }
+  }
+
+  private handleConversionCompleted(taskId: string, result: string): void {
+    const task = this.conversionTasks.get(taskId);
+    if (task) {
+      task.status = 'completed';
+      task.progress = 100;
+      this.renderConversionList();
+    }
+    this.log(`转换完成: ${result}`, 'success');
+  }
+
+  private handleConversionFailed(taskId: string, error: string): void {
+    const task = this.conversionTasks.get(taskId);
+    if (task) {
+      task.status = 'failed';
+      task.progress = 0;
+      this.renderConversionList();
+    }
+    this.log(`转换失败: ${error}`, 'error');
+  }
+
+  /**
+   * 转换单个文件
+   */
+  private async convertFile(fileId: string): Promise<void> {
+    const outputPath = (document.getElementById('outputPath') as HTMLInputElement).value.trim();
+    
+    if (!outputPath) {
+      this.log('请先选择输出目录', 'error');
+      return;
+    }
+
+    const file = this.audioFiles.find(f => f.id === fileId);
+    if (!file) {
+      this.log('找不到指定的文件', 'error');
+      return;
+    }
+
+    if (!file.isDownloaded) {
+      this.log(`文件尚未下载: ${file.title}`, 'error');
+      return;
+    }
+
+    try {
+      // 显示转换面板
+      this.showProgressSection(true);
+      
+      // 添加到转换列表
+      this.conversionTasks.set(fileId, {
+        id: fileId,
+        title: file.title,
+        status: 'pending',
+        progress: 0
+      });
+      this.renderConversionList();
+      
+      this.log(`开始转换: ${file.title}`, 'info');
+
+      const message: RendererToMainMessage = {
+        type: 'start-conversion',
+        payload: {
+          fileId,
+          outputDir: outputPath
+        }
+      };
+
+      const result = await window.electronAPI.sendMessage(message);
+      if (result.success) {
+        this.updateConversionTask(fileId, 'converting', 0);
+        this.log(`转换任务已启动: ${file.title}`, 'success');
+      } else {
+        throw new Error(result.error || '启动转换失败');
+      }
+    } catch (error: any) {
+      this.log(`启动转换失败: ${error.message}`, 'error');
+      this.updateConversionTask(fileId, 'failed', 0);
+    }
+  }
+
+  /**
+   * 更新转换任务
+   */
+  private updateConversionTask(taskId: string, status: string, progress: number): void {
+    const task = this.conversionTasks.get(taskId);
+    if (task) {
+      task.status = status;
+      task.progress = progress;
+      this.renderConversionList();
+    }
+  }
+
+  /**
+   * 渲染转换列表
+   */
+  private renderConversionList(): void {
+    const conversionList = document.getElementById('conversionList') as HTMLDivElement;
+    
+    if (this.conversionTasks.size === 0) {
+      conversionList.innerHTML = '<div class="empty-state"><p>暂无转换任务</p></div>';
+      return;
+    }
+
+    const tasksHtml = Array.from(this.conversionTasks.values()).map(task => {
+      const statusText = {
+        'pending': '等待中',
+        'converting': '转换中',
+        'completed': '已完成',
+        'failed': '失败'
+      }[task.status] || task.status;
+
+      return `
+        <div class="conversion-item ${task.status}">
+          <div class="conversion-header">
+            <div class="conversion-title">${this.escapeHtml(task.title)}</div>
+            <div class="conversion-status ${task.status}">${statusText}</div>
+          </div>
+          ${task.status === 'converting' ? `
+            <div class="conversion-progress">
+              <div class="conversion-progress-bar">
+                <div class="conversion-progress-fill" style="width: ${task.progress}%"></div>
+              </div>
+              <div class="conversion-info">${Math.round(task.progress)}% 完成</div>
+            </div>
+          ` : ''}
         </div>
-        <div class="task-progress-text" id="text-${taskId}">0%</div>
       `;
-      progressContainer.appendChild(progressElement);
-    }
+    }).join('');
 
-    const fillElement = document.getElementById(`fill-${taskId}`) as HTMLDivElement;
-    const textElement = document.getElementById(`text-${taskId}`) as HTMLDivElement;
-    
-    fillElement.style.width = `${progress}%`;
-    textElement.textContent = `${Math.round(progress)}%`;
-
-    // 更新总体进度
-    this.updateOverallProgress();
-  }
-
-  private updateOverallProgress(): void {
-    const progressElements = document.querySelectorAll('[id^="fill-"]');
-    let totalProgress = 0;
-    let completedTasks = 0;
-
-    progressElements.forEach(element => {
-      const width = parseFloat((element as HTMLDivElement).style.width) || 0;
-      totalProgress += width;
-      if (width >= 100) completedTasks++;
-    });
-
-    const averageProgress = progressElements.length > 0 ? totalProgress / progressElements.length : 0;
-    
-    const overallFill = document.getElementById('overallProgress') as HTMLDivElement;
-    const overallText = document.getElementById('overallProgressText') as HTMLSpanElement;
-    
-    overallFill.style.width = `${averageProgress}%`;
-    overallText.textContent = `${Math.round(averageProgress)}%`;
-
-    if (averageProgress >= 100) {
-      this.log(`所有转换任务已完成！`, 'success');
-      setTimeout(() => {
-        this.showProgressSection(false);
-      }, 2000);
-    }
-  }
-
-  private handleTaskCompleted(taskId: string, result: string): void {
-    this.log(`任务完成: ${taskId} -> ${result}`, 'success');
-    
-    // 更新文件状态
-    const statusElement = document.getElementById(`status-${taskId}`);
-    if (statusElement) {
-      statusElement.className = 'file-status completed';
-      statusElement.textContent = '已完成';
-    }
-  }
-
-  private handleTaskFailed(taskId: string, error: string): void {
-    this.log(`任务失败: ${taskId} - ${error}`, 'error');
-    
-    // 更新文件状态
-    const statusElement = document.getElementById(`status-${taskId}`);
-    if (statusElement) {
-      statusElement.className = 'file-status failed';
-      statusElement.textContent = '失败';
-    }
+    conversionList.innerHTML = tasksHtml;
   }
 
   private showProgressSection(show: boolean): void {

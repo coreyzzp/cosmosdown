@@ -64,6 +64,14 @@
                     <button id="clearFilterBtn" class="btn btn-secondary" disabled>清除</button>
                 </div>
                 
+                <!-- 下载状态过滤 -->
+                <div class="download-filter-bar">
+                    <span class="filter-label">下载状态:</span>
+                    <button id="downloadFilterAll" class="btn btn-filter active" disabled>全部</button>
+                    <button id="downloadFilterDownloaded" class="btn btn-filter" disabled>已下载</button>
+                    <button id="downloadFilterNotDownloaded" class="btn btn-filter" disabled>未下载</button>
+                </div>
+                
                 <div id="filesList" class="files-list">
                     <div class="empty-state">
                         <p>请先连接数据库以查看音频文件</p>
@@ -88,15 +96,8 @@
             <!-- 转换进度区域 -->
             <section class="section progress-section" style="display: none;">
                 <h2>⚡ 转换进度</h2>
-                <div id="progressContainer">
-                    <!-- 动态生成的进度条 -->
-                </div>
-                <div class="overall-progress">
-                    <label>总体进度:</label>
-                    <div class="progress-bar">
-                        <div id="overallProgress" class="progress-fill"></div>
-                    </div>
-                    <span id="overallProgressText">0%</span>
+                <div class="conversion-list" id="conversionList">
+                    <!-- 动态生成的转换任务 -->
                 </div>
             </section>
 

@@ -17,11 +17,20 @@ import {
 export class CosmosDbService {
   private db: sqlite3.Database | null = null;
   private dbPath: string | null = null;
+  private audioFilePath: string | null = null; // 音频文件目录路径
+
+  /**
+   * 设置音频文件路径
+   */
+  setAudioFilePath(audioFilePath: string): void {
+    this.audioFilePath = audioFilePath;
+    console.log(`音频文件路径已设置: ${audioFilePath}`);
+  }
 
   /**
    * 连接到 Cosmos 数据库
    */
-  async connect(dbPath: string): Promise<void> {
+  async connect(dbPath: string, audioFilePath?: string): Promise<void> {
     return new Promise((resolve, reject) => {
       // 检查文件是否存在
       if (!fs.existsSync(dbPath)) {
@@ -36,12 +45,20 @@ export class CosmosDbService {
 
       this.dbPath = dbPath;
       
+      // 设置音频文件路径
+      if (audioFilePath) {
+        this.audioFilePath = audioFilePath;
+      }
+      
       this.db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
         if (err) {
           console.error('数据库连接失败:', err);
           reject(new Error(`数据库连接失败: ${err.message}`));
         } else {
           console.log(`Cosmos 数据库连接成功: ${dbPath}`);
+          if (this.audioFilePath) {
+            console.log(`音频文件目录: ${this.audioFilePath}`);
+          }
           resolve();
         }
       });
@@ -368,24 +385,51 @@ export class CosmosDbService {
           reject(new Error(`获取播放列表信息失败: ${err.message}`));
         } else {
           const results = rows.map(row => {
-            // 尝试查找本地文件路径
+            // 查找本地文件路径
             let localPath = null;
             let isDownloaded = false;
+            let localFileSize = 0;
+            let localFileFormat = '';
             
-            if (this.dbPath && row.audio_filename) {
-              const dbDir = path.dirname(this.dbPath);
-              const possiblePaths = [
-                path.join(dbDir, row.audio_filename),
-                path.join(dbDir, 'audio', row.audio_filename),
-                path.join(dbDir, '..', 'audio', row.audio_filename),
-                path.join(dbDir, 'files', row.audio_filename),
-              ];
+            if (row.id) {
+              // 使用配置的音频文件路径或回退到旧的推测逻辑
+              let audioDir: string;
               
-              for (const p of possiblePaths) {
-                if (fs.existsSync(p)) {
-                  localPath = p;
-                  isDownloaded = true;
-                  break;
+              if (this.audioFilePath) {
+                // 新逻辑：使用设置的音频文件路径 /Documents/AudioFile/{userId}
+                audioDir = this.audioFilePath;
+              } else if (this.dbPath) {
+                // 旧逻辑：从数据库路径推测
+                // 数据库路径: .../{userId}/db/cosmos.db
+                // 音频文件路径: .../AudioFile/{userId}
+                const userDir = path.dirname(path.dirname(this.dbPath)); // 上两级到用户目录
+                const documentsDir = path.dirname(userDir); // 再上一级到Documents
+                const userId = path.basename(userDir);
+                audioDir = path.join(documentsDir, 'AudioFile', userId);
+              } else {
+                audioDir = '';
+              }
+              
+              if (audioDir) {
+                // 尝试多种可能的文件扩展名
+                const possibleExtensions = ['m4a', 'mp3', 'wav', 'aac'];
+                
+                for (const ext of possibleExtensions) {
+                  const potentialPath = path.join(audioDir, `${row.id}.${ext}`);
+                  if (fs.existsSync(potentialPath)) {
+                    localPath = potentialPath;
+                    isDownloaded = true;
+                    localFileFormat = ext;
+                    
+                    // 获取文件大小
+                    try {
+                      const stats = fs.statSync(potentialPath);
+                      localFileSize = stats.size;
+                    } catch (e) {
+                      console.error('获取文件大小失败:', e);
+                    }
+                    break;
+                  }
                 }
               }
             }
@@ -423,6 +467,8 @@ export class CosmosDbService {
               // 本地文件信息
               localPath,
               isDownloaded,
+              localFileSize,
+              localFileFormat,
               
               // 播放进度
               progress: row.progress || 0,

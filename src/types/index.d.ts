@@ -54,6 +54,8 @@ export type MainToRendererMessage = {
     type: 'database-connected';
     payload: {
         path: string;
+        autoConnected?: boolean;
+        appInfo?: any;
     };
 } | {
     type: 'files-found';
@@ -69,7 +71,14 @@ export type RendererToMainMessage = {
 } | {
     type: 'start-conversion';
     payload: {
-        files: string[];
+        fileId?: string;
+        files?: string[];
+        outputDir: string;
+    };
+} | {
+    type: 'batch-conversion';
+    payload: {
+        fileIds: string[];
         outputDir: string;
     };
 } | {

@@ -47,12 +47,13 @@ export type MainToRendererMessage =
   | { type: 'task-progress'; payload: { taskId: string; progress: number } }
   | { type: 'task-completed'; payload: { taskId: string; result: string } }
   | { type: 'task-failed'; payload: { taskId: string; error: string } }
-  | { type: 'database-connected'; payload: { path: string } }
+  | { type: 'database-connected'; payload: { path: string; autoConnected?: boolean; appInfo?: any } }
   | { type: 'files-found'; payload: { files: AudioFileInfo[] } };
 
 // 渲染进程到主进程的消息类型
 export type RendererToMainMessage =
   | { type: 'open-database'; payload: { path: string } }
-  | { type: 'start-conversion'; payload: { files: string[]; outputDir: string } }
+  | { type: 'start-conversion'; payload: { fileId?: string; files?: string[]; outputDir: string } }
+  | { type: 'batch-conversion'; payload: { fileIds: string[]; outputDir: string } }
   | { type: 'get-files'; payload: {} }
   | { type: 'set-config'; payload: AppConfig };

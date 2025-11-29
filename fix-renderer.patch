@@ -1,0 +1,100 @@
+--- a/src/renderer/renderer.ts
++++ b/src/renderer/renderer.ts
+@@ -823,76 +823,8 @@
+ 
+     conversionList.innerHTML = tasksHtml;
+   }
+-    // 更新单个任务进度
+-    let progressElement = document.getElementById(`progress-${taskId}`);
+-    if (!progressElement) {
+-      const progressContainer = document.getElementById('progressContainer') as HTMLDivElement;
+-      progressElement = document.createElement('div');
+-      progressElement.className = 'task-progress';
+-      progressElement.id = `progress-${taskId}`;
+-      progressElement.innerHTML = `
+-        <div class="task-name">${taskId}</div>
+-        <div class="progress-bar">
+-          <div class="progress-fill" id="fill-${taskId}"></div>
+-        </div>
+-        <div class="task-progress-text" id="text-${taskId}">0%</div>
+-      `;
+-      progressContainer.appendChild(progressElement);
+-    }
+-
+-    const fillElement = document.getElementById(`fill-${taskId}`) as HTMLDivElement;
+-    const textElement = document.getElementById(`text-${taskId}`) as HTMLDivElement;
+-    
+-    fillElement.style.width = `${progress}%`;
+-    textElement.textContent = `${Math.round(progress)}%`;
+-
+-    // 更新总体进度
+-    this.updateOverallProgress();
+-  }
+-
+-  private updateOverallProgress(): void {
+-    const progressElements = document.querySelectorAll('[id^="fill-"]');
+-    let totalProgress = 0;
+-    let completedTasks = 0;
+-
+-    progressElements.forEach(element => {
+-      const width = parseFloat((element as HTMLDivElement).style.width) || 0;
+-      totalProgress += width;
+-      if (width >= 100) completedTasks++;
+-    });
+-
+-    const averageProgress = progressElements.length > 0 ? totalProgress / progressElements.length : 0;
+-    
+-    const overallFill = document.getElementById('overallProgress') as HTMLDivElement;
+-    const overallText = document.getElementById('overallProgressText') as HTMLSpanElement;
+-    
+-    overallFill.style.width = `${averageProgress}%`;
+-    overallText.textContent = `${Math.round(averageProgress)}%`;
+-
+-    if (averageProgress >= 100) {
+-      this.log(`所有转换任务已完成！`, 'success');
+-      setTimeout(() => {
+-        this.showProgressSection(false);
+-      }, 2000);
+-    }
+-  }
+-
+-  private handleTaskCompleted(taskId: string, result: string): void {
+-    this.log(`任务完成: ${taskId} -> ${result}`, 'success');
+-    
+-    // 更新文件状态
+-    const statusElement = document.getElementById(`status-${taskId}`);
+-    if (statusElement) {
+-      statusElement.className = 'file-status completed';
+-      statusElement.textContent = '已完成';
+-    }
+-  }
+-
+-  private handleTaskFailed(taskId: string, error: string): void {
+-    this.log(`任务失败: ${taskId} - ${error}`, 'error');
+     
+-    // 更新文件状态
+-    const statusElement = document.getElementById(`status-${taskId}`);
+-    if (statusElement) {
+-      statusElement.className = 'file-status failed';
+-      statusElement.textContent = '失败';
+-    }
+-  }
+-
+-  private showProgressSection(show: boolean): void {
+-    const progressSection = document.querySelector('.progress-section') as HTMLElement;
+-    progressSection.style.display = show ? 'block' : 'none';
+-    
+-    if (!show) {
+-      // 清空进度容器
+-      const progressContainer = document.getElementById('progressContainer') as HTMLDivElement;
+-      progressContainer.innerHTML = '';
+-      
+-      // 重置总体进度
+-      const overallFill = document.getElementById('overallProgress') as HTMLDivElement;
+-      const overallText = document.getElementById('overallProgressText') as HTMLSpanElement;
+-      overallFill.style.width = '0%';
+-      overallText.textContent = '0%';
+-    }
+-  }
+-
+   private selectAllFiles(select: boolean): void {
