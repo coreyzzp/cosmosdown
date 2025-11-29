@@ -18,6 +18,13 @@ class RendererApp {
   }
 
   private setupEventListeners(): void {
+    // 数据库路径输入框监听
+    const dbPathInput = document.getElementById('dbPath') as HTMLInputElement;
+    dbPathInput.addEventListener('input', () => {
+      const connectBtn = document.getElementById('connectBtn') as HTMLButtonElement;
+      connectBtn.disabled = !dbPathInput.value.trim();
+    });
+
     // 选择数据库按钮
     const selectDbBtn = document.getElementById('selectDbBtn') as HTMLButtonElement;
     selectDbBtn.addEventListener('click', async () => {

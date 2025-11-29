@@ -1,12 +1,14 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import { DatabaseService } from './services/DatabaseService';
-import { AudioProcessor } from './services/AudioProcessor';
+import { AudioProcessor }  from './services/AudioProcessor';
+import { CosmosDbService } from './services/CosmosDbService';
 import { RendererToMainMessage, MainToRendererMessage, AppConfig } from '../types';
 
 class MainProcess {
   private mainWindow: BrowserWindow | null = null;
   private databaseService: DatabaseService;
+  private cosmosDbService: CosmosDbService;
   private audioProcessor: AudioProcessor;
   private appConfig: AppConfig = {
     database: { path: '', readonly: true },
@@ -17,6 +19,7 @@ class MainProcess {
 
   constructor() {
     this.databaseService = new DatabaseService();
+    this.cosmosDbService = new CosmosDbService();
     this.audioProcessor = new AudioProcessor();
     this.setupApp();
     this.setupIPC();
@@ -56,10 +59,10 @@ class MainProcess {
     // 开发环境加载本地文件，生产环境可以加载打包后的文件
     const isDev = process.env.NODE_ENV === 'development';
     if (isDev) {
-      this.mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+      this.mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
       this.mainWindow.webContents.openDevTools();
     } else {
-      this.mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+      this.mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
     }
 
     this.mainWindow.once('ready-to-show', () => {
@@ -73,7 +76,9 @@ class MainProcess {
       try {
         if (message.type === 'open-database') {
           const { path: dbPath } = message.payload;
-          await this.databaseService.connect(dbPath);
+          
+          // 尝试连接 Cosmos 数据库
+          await this.cosmosDbService.connect(dbPath);
           
           const response: MainToRendererMessage = {
             type: 'database-connected',
@@ -81,7 +86,12 @@ class MainProcess {
           };
           
           this.mainWindow?.webContents.send('main-message', response);
-          return { success: true, path: dbPath };
+          
+          // 获取统计信息
+          const stats = await this.cosmosDbService.getStatistics();
+          console.log('数据库统计:', stats);
+          
+          return { success: true, path: dbPath, stats };
         }
         return { success: false, error: 'Invalid message type' };
       } catch (error: any) {
@@ -94,7 +104,22 @@ class MainProcess {
     ipcMain.handle('get-files', async (event, message: RendererToMainMessage) => {
       try {
         if (message.type === 'get-files') {
-          const files = await this.databaseService.getAudioFiles();
+          // 使用 CosmosDbService 获取音频文件（包含本地路径）
+          const audioFiles = await this.cosmosDbService.getAudioFilesWithLocalPaths();
+          
+          // 转换为通用格式
+          const files = audioFiles.map((file, index) => ({
+            id: index + 1,
+            originalPath: file.localPath || file.url,
+            fileName: file.name,
+            fileSize: file.size * 1024 * 1024, // 转换为字节
+            duration: undefined,
+            format: 'm4a',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            url: file.url,
+            isDownloaded: file.isDownloaded
+          }));
           
           const response: MainToRendererMessage = {
             type: 'files-found',

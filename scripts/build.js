@@ -41,6 +41,14 @@ try {
       path.join(rendererDist, 'styles.css')
     );
   }
+  
+  // 复制 renderer-wrapper.js 文件
+  if (fs.existsSync(path.join(rendererSrc, 'renderer-wrapper.js'))) {
+    fs.copyFileSync(
+      path.join(rendererSrc, 'renderer-wrapper.js'),
+      path.join(rendererDist, 'renderer-wrapper.js')
+    );
+  }
 
   // 编译 preload 脚本
   console.log('🔧 编译 preload 脚本...');

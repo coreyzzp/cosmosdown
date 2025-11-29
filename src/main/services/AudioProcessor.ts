@@ -2,7 +2,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ConversionTask, AppConfig } from '../../types';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export class AudioProcessor {
   private activeTasks: Map<string, ConversionTask> = new Map();
@@ -61,7 +61,7 @@ export class AudioProcessor {
 
     // 创建转换任务
     const tasks: ConversionTask[] = filePaths.map(filePath => ({
-      id: uuidv4(),
+      id: randomUUID(),
       sourceFile: filePath,
       targetFile: this.generateOutputPath(filePath, outputDirectory),
       status: 'pending',
