@@ -27,13 +27,21 @@
 npm install
 ```
 
-安装后会自动重新编译原生模块（sqlite3）以匹配 Electron 版本。
-
-如果遇到启动问题，可以手动重新编译：
+**重要：** 安装依赖后，必须重新编译原生模块以匹配 Electron 版本：
 
 ```bash
 npm run rebuild
 ```
+
+这个命令会：
+1. 重新编译 sqlite3 模块
+2. 使用 electron-rebuild 针对 Electron 版本重新构建
+
+**注意：** 每次以下情况都需要重新运行 `npm run rebuild`：
+- 首次安装项目
+- 更新了 Electron 版本
+- 更新了 Node.js 版本
+- `npm start` 报错 "Could not locate the bindings file"
 
 ## 开发模式
 
