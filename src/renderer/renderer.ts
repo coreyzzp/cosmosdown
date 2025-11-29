@@ -2,14 +2,41 @@ import { MainToRendererMessage, RendererToMainMessage, AudioFileInfo, Conversion
 
 class RendererApp {
   private selectedFiles: Set<string> = new Set();
-  private audioFiles: AudioFileInfo[] = [];
+  private audioFiles: any[] = [];
+  private filteredFiles: any[] = [];
   private conversionTasks: Map<string, ConversionTask> = new Map();
   private isConnected = false;
+  private sortBy: 'title' | 'pubDate' | 'playCount' | 'duration' = 'pubDate';
+  private sortOrder: 'asc' | 'desc' = 'desc';
+  private filterText = '';
+  private currentDetailFile: any = null;
 
   constructor() {
     this.initializeApp();
     this.setupEventListeners();
     this.setupIPCListeners();
+    this.loadLastDatabase();
+  }
+
+  /**
+   * 加载上次打开的数据库路径
+   */
+  private loadLastDatabase(): void {
+    const lastDbPath = localStorage.getItem('lastDatabasePath');
+    if (lastDbPath) {
+      const dbPathInput = document.getElementById('dbPath') as HTMLInputElement;
+      dbPathInput.value = lastDbPath;
+      const connectBtn = document.getElementById('connectBtn') as HTMLButtonElement;
+      connectBtn.disabled = false;
+      this.log(`已加载上次打开的数据库: ${lastDbPath}`, 'info');
+    }
+  }
+
+  /**
+   * 保存数据库路径到本地存储
+   */
+  private saveLastDatabase(dbPath: string): void {
+    localStorage.setItem('lastDatabasePath', dbPath);
   }
 
   private initializeApp(): void {
@@ -24,6 +51,53 @@ class RendererApp {
       const connectBtn = document.getElementById('connectBtn') as HTMLButtonElement;
       connectBtn.disabled = !dbPathInput.value.trim();
     });
+
+    // 详情面板关闭按钮
+    const closeDetailsBtn = document.getElementById('closeDetailsBtn') as HTMLButtonElement;
+    closeDetailsBtn?.addEventListener('click', () => {
+      this.hideDetailsPanel();
+    });
+
+    // 点击遮罩层关闭
+    const detailsPanel = document.getElementById('detailsPanel') as HTMLDivElement;
+    const detailsOverlay = detailsPanel?.querySelector('.details-overlay') as HTMLDivElement;
+    detailsOverlay?.addEventListener('click', () => {
+      this.hideDetailsPanel();
+    });
+
+    // 过滤输入框监听
+    const filterInput = document.getElementById('filterInput') as HTMLInputElement;
+    filterInput?.addEventListener('input', (e) => {
+      this.filterText = (e.target as HTMLInputElement).value.trim();
+      this.applyFilter();
+      const clearBtn = document.getElementById('clearFilterBtn') as HTMLButtonElement;
+      if (clearBtn) {
+        clearBtn.disabled = !this.filterText;
+      }
+    });
+
+    // 清除过滤按钮
+    const clearFilterBtn = document.getElementById('clearFilterBtn') as HTMLButtonElement;
+    clearFilterBtn?.addEventListener('click', () => {
+      const filterInput = document.getElementById('filterInput') as HTMLInputElement;
+      if (filterInput) {
+        filterInput.value = '';
+        this.filterText = '';
+        this.applyFilter();
+        clearFilterBtn.disabled = true;
+      }
+    });
+
+    // 排序按钮监听
+    const sortTitleBtn = document.getElementById('sortByTitle') as HTMLButtonElement;
+    const sortDateBtn = document.getElementById('sortByDate') as HTMLButtonElement;
+    const sortPlayBtn = document.getElementById('sortByPlay') as HTMLButtonElement;
+    const sortDurationBtn = document.getElementById('sortByDuration') as HTMLButtonElement;
+
+    sortTitleBtn?.addEventListener('click', () => this.setSortBy('title'));
+    sortDateBtn?.addEventListener('click', () => this.setSortBy('pubDate'));
+    sortPlayBtn?.addEventListener('click', () => this.setSortBy('playCount'));
+    sortDurationBtn?.addEventListener('click', () => this.setSortBy('duration'));
 
     // 选择数据库按钮
     const selectDbBtn = document.getElementById('selectDbBtn') as HTMLButtonElement;
@@ -62,6 +136,7 @@ class RendererApp {
         if (result.success) {
           this.isConnected = true;
           this.updateConnectionStatus(true, dbPath);
+          this.saveLastDatabase(dbPath); // 保存数据库路径
           this.log(`数据库连接成功: ${dbPath}`, 'success');
           await this.loadFiles();
         } else {
@@ -168,8 +243,14 @@ class RendererApp {
       const result = await window.electronAPI.sendMessage(message);
       if (result.success) {
         this.audioFiles = result.files;
-        this.renderFilesList();
+        this.applyFilter(); // 应用过滤
         this.log(`加载了 ${this.audioFiles.length} 个音频文件`, 'info');
+        
+        // 启用过滤输入框
+        const filterInput = document.getElementById('filterInput') as HTMLInputElement;
+        if (filterInput) {
+          filterInput.disabled = false;
+        }
       } else {
         throw new Error(result.error || '加载文件失败');
       }
@@ -178,31 +259,329 @@ class RendererApp {
     }
   }
 
+  /**
+   * 应用过滤
+   */
+  private applyFilter(): void {
+    if (!this.filterText) {
+      this.filteredFiles = this.audioFiles;
+    } else {
+      const searchTerm = this.filterText.toLowerCase();
+      this.filteredFiles = this.audioFiles.filter(file => {
+        const title = (file.title || '').toLowerCase();
+        const podcastTitle = (file.podcastTitle || '').toLowerCase();
+        const podcastAuthor = (file.podcastAuthor || '').toLowerCase();
+        const description = (file.description || '').toLowerCase();
+        
+        return title.includes(searchTerm) || 
+               podcastTitle.includes(searchTerm) || 
+               podcastAuthor.includes(searchTerm) ||
+               description.includes(searchTerm);
+      });
+    }
+    
+    this.renderFilesList();
+    
+    if (this.filterText) {
+      this.log(`过滤结果: ${this.filteredFiles.length} / ${this.audioFiles.length} 个文件`, 'info');
+    }
+  }
+
+  /**
+   * 设置排序方式
+   */
+  private setSortBy(sortBy: 'title' | 'pubDate' | 'playCount' | 'duration'): void {
+    if (this.sortBy === sortBy) {
+      // 切换排序顺序
+      this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortBy = sortBy;
+      this.sortOrder = 'desc';
+    }
+    
+    this.renderFilesList();
+    this.updateSortButtons();
+    this.log(`已按 ${sortBy} ${this.sortOrder === 'asc' ? '升序' : '降序'} 排序`);
+  }
+
+  /**
+   * 更新排序按钮状态
+   */
+  private updateSortButtons(): void {
+    const buttons = {
+      'title': document.getElementById('sortByTitle'),
+      'pubDate': document.getElementById('sortByDate'),
+      'playCount': document.getElementById('sortByPlay'),
+      'duration': document.getElementById('sortByDuration')
+    };
+
+    Object.entries(buttons).forEach(([key, btn]) => {
+      if (btn) {
+        btn.className = key === this.sortBy 
+          ? `btn btn-secondary active ${this.sortOrder}`
+          : 'btn btn-secondary';
+      }
+    });
+  }
+
+  /**
+   * 排序音频文件列表
+   */
+  private sortAudioFiles(files: any[]): any[] {
+    return [...files].sort((a, b) => {
+      let aVal = a[this.sortBy];
+      let bVal = b[this.sortBy];
+
+      // 处理空值
+      if (aVal === null || aVal === undefined) aVal = this.sortBy === 'title' ? '' : 0;
+      if (bVal === null || bVal === undefined) bVal = this.sortBy === 'title' ? '' : 0;
+
+      // 字符串比较
+      if (typeof aVal === 'string') {
+        return this.sortOrder === 'asc' 
+          ? aVal.localeCompare(bVal) 
+          : bVal.localeCompare(aVal);
+      }
+
+      // 数值比较
+      return this.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+  }
+
+  /**
+   * 显示详情面板
+   */
+  private showDetailsPanel(file: any): void {
+    this.currentDetailFile = file;
+    const detailsPanel = document.getElementById('detailsPanel') as HTMLDivElement;
+    const detailsBody = detailsPanel.querySelector('.details-body') as HTMLDivElement;
+
+    const pubDate = file.pubDate ? new Date(file.pubDate * 1000).toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : '未知';
+    
+    const duration = file.duration ? this.formatDuration(file.duration) : '未知';
+    const fileSize = file.audioSize ? this.formatFileSize(file.audioSize) : '未知';
+    
+    const progressInfo = file.progress > 0 
+      ? `${this.formatDuration(file.progress)} (${file.progressPercent}%)`
+      : '未播放';
+    
+    const lastPlayedInfo = file.lastPlayed 
+      ? new Date(file.lastPlayed * 1000).toLocaleString('zh-CN')
+      : '从未播放';
+
+    detailsBody.innerHTML = `
+      <div class="detail-section">
+        <h3>📻 单集信息</h3>
+        <div class="detail-row">
+          <div class="detail-label">标题</div>
+          <div class="detail-value">${this.escapeHtml(file.title || '未命名')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">播客</div>
+          <div class="detail-value">${this.escapeHtml(file.podcastTitle || '未知')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">作者</div>
+          <div class="detail-value">${this.escapeHtml(file.podcastAuthor || '未知')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">描述</div>
+          <div class="detail-value">${this.escapeHtml(file.description || '无描述')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">封面</div>
+          <div class="detail-value">
+            ${file.image ? `<img src="${file.image}" style="max-width: 200px; border-radius: 8px; margin-top: 8px;" onerror="this.style.display='none'">` : '无'}
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h3>🎵 音频文件</h3>
+        <div class="detail-row">
+          <div class="detail-label">文件名</div>
+          <div class="detail-value">${this.escapeHtml(file.audioFilename || '未知')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">URL</div>
+          <div class="detail-value long-text">${this.escapeHtml(file.audioUrl || '未知')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">本地路径</div>
+          <div class="detail-value long-text">${this.escapeHtml(file.localPath || '未下载')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">文件大小</div>
+          <div class="detail-value">${fileSize}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">加密密钥</div>
+          <div class="detail-value long-text">${this.escapeHtml(file.audioKey || '无')}</div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h3>📊 统计信息</h3>
+        <div class="detail-row">
+          <div class="detail-label">播放次数</div>
+          <div class="detail-value">${file.playCount || 0} 次</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">评论数</div>
+          <div class="detail-value">${file.commentCount || 0} 条</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">订阅数</div>
+          <div class="detail-value">${file.subscriptionCount || 0} 人</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">发布日期</div>
+          <div class="detail-value">${pubDate}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">时长</div>
+          <div class="detail-value">${duration}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">播放进度</div>
+          <div class="detail-value">${progressInfo}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">最后播放</div>
+          <div class="detail-value">${lastPlayedInfo}</div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h3>✓ 状态</h3>
+        <div class="detail-row">
+          <div class="detail-label">收藏</div>
+          <div class="detail-value">${file.isFavorited ? '❤️ 是' : '否'}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">已完成</div>
+          <div class="detail-value">${file.isFinished ? '✓ 是' : '否'}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">已下载</div>
+          <div class="detail-value">${file.isDownloaded ? '💾 是' : '否'}</div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h3>🔑 技术信息</h3>
+        <div class="detail-row">
+          <div class="detail-label">单集ID</div>
+          <div class="detail-value">${this.escapeHtml(file.id || '未知')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">播客ID</div>
+          <div class="detail-value">${this.escapeHtml(file.podcastId || '未知')}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">音频EID</div>
+          <div class="detail-value">${this.escapeHtml(file.audioEid || '未知')}</div>
+        </div>
+      </div>
+    `;
+
+    detailsPanel.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+  }
+
+  /**
+   * 隐藏详情面板
+   */
+  private hideDetailsPanel(): void {
+    const detailsPanel = document.getElementById('detailsPanel') as HTMLDivElement;
+    detailsPanel.style.display = 'none';
+    document.body.style.overflow = ''; // 恢复滚动
+    this.currentDetailFile = null;
+  }
+
   private renderFilesList(): void {
     const filesList = document.getElementById('filesList') as HTMLDivElement;
     
-    if (this.audioFiles.length === 0) {
-      filesList.innerHTML = '<div class="empty-state"><p>未找到音频文件</p></div>';
+    if (this.filteredFiles.length === 0) {
+      if (this.filterText) {
+        filesList.innerHTML = '<div class="empty-state"><p>没有找到匹配的文件</p></div>';
+      } else {
+        filesList.innerHTML = '<div class="empty-state"><p>未找到音频文件</p></div>';
+      }
       return;
     }
 
-    const filesHtml = this.audioFiles.map(file => `
+    // 排序文件
+    const sortedFiles = this.sortAudioFiles(this.filteredFiles);
+
+    const filesHtml = sortedFiles.map(file => {
+      const pubDate = file.pubDate ? new Date(file.pubDate * 1000).toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }) : '未知';
+      
+      const duration = file.duration ? this.formatDuration(file.duration) : '未知';
+      const fileSize = file.audioSize ? this.formatFileSize(file.audioSize) : '未知';
+
+      // 构建状态标签
+      const badges = [];
+      if (file.isFavorited) badges.push('<span class="badge badge-favorite">❤️ 收藏</span>');
+      if (file.isFinished) badges.push('<span class="badge badge-finished">✓ 已听完</span>');
+      if (file.isDownloaded) badges.push('<span class="badge badge-downloaded">💾 已下载</span>');
+      if (file.progress > 0 && !file.isFinished) {
+        badges.push(`<span class="badge badge-progress">▶️ ${file.progressPercent}%</span>`);
+      }
+
+      return `
       <div class="file-item">
         <input type="checkbox" class="file-checkbox" data-file-id="${file.id}" 
-               ${this.selectedFiles.has(file.id.toString()) ? 'checked' : ''}>
+               ${this.selectedFiles.has(file.id?.toString()) ? 'checked' : ''}>
         <div class="file-info">
-          <div class="file-name">${file.fileName}</div>
-          <div class="file-details">
-            路径: ${file.originalPath} | 
-            大小: ${this.formatFileSize(file.fileSize)} |
-            时长: ${file.duration ? this.formatDuration(file.duration) : '未知'}
+          <div class="file-title">
+            ${this.escapeHtml(file.title || '未命名单集')}
+            <button class="info-btn" data-file-id="${file.id}" title="查看详细信息">ℹ</button>
+          </div>
+          <div class="file-meta">
+            <span class="podcast-title">${this.escapeHtml(file.podcastTitle || '未知播客')}</span>
+            ${file.podcastAuthor ? `<span class="podcast-author">· ${this.escapeHtml(file.podcastAuthor)}</span>` : ''}
+          </div>
+          <div class="file-badges">
+            ${badges.join(' ')}
+          </div>
+          <div class="file-stats">
+            <span class="stat" title="发布日期">📅 ${pubDate}</span>
+            <span class="stat" title="时长">⏱ ${duration}</span>
+            <span class="stat" title="播放次数">▶️ ${file.playCount || 0}</span>
+            <span class="stat" title="评论数">💬 ${file.commentCount || 0}</span>
+            <span class="stat" title="文件大小">💾 ${fileSize}</span>
           </div>
         </div>
         <div class="file-status pending" id="status-${file.id}">待处理</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     filesList.innerHTML = filesHtml;
+
+    // 设置信息按钮点击事件
+    const infoButtons = filesList.querySelectorAll('.info-btn') as NodeListOf<HTMLButtonElement>;
+    infoButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // 防止触发其他事件
+        const fileId = btn.dataset.fileId!;
+        const file = this.filteredFiles.find(f => f.id?.toString() === fileId);
+        if (file) {
+          this.showDetailsPanel(file);
+        }
+      });
+    });
 
     // 添加复选框事件监听器
     const checkboxes = filesList.querySelectorAll('.file-checkbox') as NodeListOf<HTMLInputElement>;
@@ -222,6 +601,16 @@ class RendererApp {
     });
 
     this.updateUI();
+    this.updateSortButtons();
+  }
+
+  /**
+   * HTML转义
+   */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   private selectAllFiles(select: boolean): void {

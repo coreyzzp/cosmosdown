@@ -307,6 +307,137 @@ export class CosmosDbService {
   }
 
   /**
+   * 获取完整的播客单集信息
+   * 正确的关联逻辑：
+   * 1. Playlist (播放列表/单集) 是主表，每一行代表一个播客单集
+   * 2. Playlist.pid → PlaylistPodcast.id (单集属于哪个播客频道)
+   * 3. Playlist.media JSON → AudioFileTable_v2.url (单集对应的音频文件)
+   * 4. PlaylistProgress.id → Playlist.id (播放进度)
+   */
+  async getPlaylistsWithFullInfo(): Promise<any[]> {
+    if (!this.db) {
+      throw new Error('数据库未连接');
+    }
+
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT 
+          -- 播放列表/单集信息
+          p.id,
+          p.pid,
+          p.title,
+          p.description,
+          p.image,
+          p.duration,
+          p.pubDate,
+          p.playCount,
+          p.commentCount,
+          p.isFavorited,
+          p.isFinished,
+          p.media,
+          
+          -- 播客频道信息
+          pp.id as podcast_id,
+          pp.title as podcast_title,
+          pp.author as podcast_author,
+          pp.description as podcast_description,
+          pp.image as podcast_image,
+          pp.subscriptionCount,
+          
+          -- 音频文件信息（通过media JSON关联）
+          a.eid as audio_eid,
+          a.name as audio_filename,
+          a.url as audio_url,
+          a.size as audio_size,
+          a.audioKey as audio_key,
+          
+          -- 播放进度
+          pg.idProgress as progress,
+          pg.playedAt as last_played
+          
+        FROM Playlist p
+        LEFT JOIN PlaylistPodcast pp ON p.pid = pp.id
+        LEFT JOIN AudioFileTable_v2 a ON json_extract(p.media, '$.enclosure.url') = a.url
+        LEFT JOIN PlaylistProgress pg ON p.id = pg.id
+        
+        ORDER BY p.pubDate DESC
+      `;
+
+      this.db!.all(query, (err, rows: any[]) => {
+        if (err) {
+          reject(new Error(`获取播放列表信息失败: ${err.message}`));
+        } else {
+          const results = rows.map(row => {
+            // 尝试查找本地文件路径
+            let localPath = null;
+            let isDownloaded = false;
+            
+            if (this.dbPath && row.audio_filename) {
+              const dbDir = path.dirname(this.dbPath);
+              const possiblePaths = [
+                path.join(dbDir, row.audio_filename),
+                path.join(dbDir, 'audio', row.audio_filename),
+                path.join(dbDir, '..', 'audio', row.audio_filename),
+                path.join(dbDir, 'files', row.audio_filename),
+              ];
+              
+              for (const p of possiblePaths) {
+                if (fs.existsSync(p)) {
+                  localPath = p;
+                  isDownloaded = true;
+                  break;
+                }
+              }
+            }
+
+            return {
+              // 唯一标识
+              id: row.id,
+              
+              // 单集信息（用户可见的主要信息）
+              title: row.title,
+              description: row.description,
+              image: row.image,
+              duration: row.duration,
+              pubDate: row.pubDate,
+              playCount: row.playCount || 0,
+              commentCount: row.commentCount || 0,
+              isFavorited: row.isFavorited === 1,
+              isFinished: row.isFinished === 1,
+              
+              // 播客频道信息
+              podcastId: row.podcast_id,
+              podcastTitle: row.podcast_title,
+              podcastAuthor: row.podcast_author,
+              podcastDescription: row.podcast_description,
+              podcastImage: row.podcast_image,
+              subscriptionCount: row.subscriptionCount || 0,
+              
+              // 音频文件信息（技术细节，hover显示）
+              audioEid: row.audio_eid,
+              audioFilename: row.audio_filename,
+              audioUrl: row.audio_url,
+              audioSize: row.audio_size ? row.audio_size * 1024 * 1024 : 0, // MB转字节
+              audioKey: row.audio_key,
+              
+              // 本地文件信息
+              localPath,
+              isDownloaded,
+              
+              // 播放进度
+              progress: row.progress || 0,
+              progressPercent: row.duration > 0 ? Math.round((row.progress / row.duration) * 100) : 0,
+              lastPlayed: row.last_played
+            };
+          });
+          
+          resolve(results);
+        }
+      });
+    });
+  }
+
+  /**
    * 获取数据库统计信息
    */
   async getStatistics(): Promise<{

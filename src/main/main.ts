@@ -100,26 +100,12 @@ class MainProcess {
       }
     });
 
-    // 获取文件列表
+    // 获取文件列表（包含完整播放列表信息）
     ipcMain.handle('get-files', async (event, message: RendererToMainMessage) => {
       try {
         if (message.type === 'get-files') {
-          // 使用 CosmosDbService 获取音频文件（包含本地路径）
-          const audioFiles = await this.cosmosDbService.getAudioFilesWithLocalPaths();
-          
-          // 转换为通用格式
-          const files = audioFiles.map((file, index) => ({
-            id: index + 1,
-            originalPath: file.localPath || file.url,
-            fileName: file.name,
-            fileSize: file.size * 1024 * 1024, // 转换为字节
-            duration: undefined,
-            format: 'm4a',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            url: file.url,
-            isDownloaded: file.isDownloaded
-          }));
+          // 使用新方法获取完整的播客单集信息
+          const files = await this.cosmosDbService.getPlaylistsWithFullInfo();
           
           const response: MainToRendererMessage = {
             type: 'files-found',

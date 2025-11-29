@@ -49,8 +49,21 @@
             <section class="section files-section">
                 <div class="section-header">
                     <h2>🎼 音频文件列表</h2>
+                    <div class="sort-controls">
+                        <button id="sortByTitle" class="btn btn-secondary">标题</button>
+                        <button id="sortByDate" class="btn btn-secondary active desc">日期 ↓</button>
+                        <button id="sortByPlay" class="btn btn-secondary">播放</button>
+                        <button id="sortByDuration" class="btn btn-secondary">时长</button>
+                    </div>
                     <button id="refreshBtn" class="btn btn-secondary" disabled>刷新列表</button>
                 </div>
+                
+                <!-- 搜索过滤 -->
+                <div class="filter-bar">
+                    <input type="text" id="filterInput" placeholder="🔍 搜索标题、播客名称或作者..." disabled>
+                    <button id="clearFilterBtn" class="btn btn-secondary" disabled>清除</button>
+                </div>
+                
                 <div id="filesList" class="files-list">
                     <div class="empty-state">
                         <p>请先连接数据库以查看音频文件</p>
@@ -62,6 +75,15 @@
                     <button id="startConversionBtn" class="btn btn-success" disabled>开始转换</button>
                 </div>
             </section>
+            
+            <!-- 详情面板 -->
+            <div id="detailsPanel" class="details-panel" style="display: none;">
+                <div class="details-overlay"></div>
+                <div class="details-content">
+                    <button class="details-close" id="closeDetailsBtn">✕</button>
+                    <div class="details-body"></div>
+                </div>
+            </div>
 
             <!-- 转换进度区域 -->
             <section class="section progress-section" style="display: none;">
