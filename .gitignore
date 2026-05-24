@@ -6,3 +6,9 @@ release/
 .env
 *.db
 !sample-audio.db
+
+# Tauri
+src-tauri/target/
+
+# pnpm
+pnpm-debug.log*
