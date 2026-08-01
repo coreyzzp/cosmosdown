@@ -49,13 +49,14 @@ export interface IPCMessage {
   payload?: any;
 }
 
-// 主进程到渲染进程的消息类型
-export type MainToRendererMessage = 
+// 后端到前端的事件消息（Tauri `app-message`）
+export type MainToRendererMessage =
   | { type: 'task-progress'; payload: { taskId: string; progress: number } }
   | { type: 'task-completed'; payload: { taskId: string; result: string } }
   | { type: 'task-failed'; payload: { taskId: string; error: string } }
   | { type: 'database-connected'; payload: { path: string; autoConnected?: boolean; appInfo?: any } }
-  | { type: 'files-found'; payload: { files: AudioFileInfo[] } };
+  | { type: 'files-found'; payload: { files: AudioFileInfo[] } }
+  | { type: 'batch-started'; payload: { total: number } };
 
 // 渲染进程到主进程的消息类型
 export type RendererToMainMessage =

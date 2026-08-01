@@ -1,88 +1,35 @@
 {
   "name": "miniubrowser",
   "version": "1.0.0",
+  "private": true,
   "description": "a multi platform mini univer inner content extractor",
-  "main": "dist/main.js",
+  "type": "module",
   "scripts": {
-    "build": "node scripts/esbuild.config.js",
-    "build:old": "node scripts/build.js",
-    "rebuild": "npm rebuild sqlite3 --build-from-source && npx electron-rebuild -f -w sqlite3",
-    "dev": "npm run build && electron dist/main.js",
-    "start": "electron dist/main.js",
-    "pack": "npm run build && electron-builder",
-    "pack:mac": "npm run build && electron-builder --mac",
-    "pack:win": "npm run build && electron-builder --win",
-    "pack:linux": "npm run build && electron-builder --linux",
-    "dist": "npm run build && electron-builder",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:linux": "npm run build && electron-builder --linux",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "test": "jest",
-    "clean": "rimraf dist release",
+    "clean": "rimraf dist src-tauri/target",
     "create-sample-db": "node scripts/create-sample-db.js"
   },
   "author": "corey",
   "license": "ISC",
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-opener": "^2"
+  },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
     "@types/jest": "^29.5.8",
     "@types/node": "^20.10.0",
-    "electron": "^27.1.3",
-    "electron-builder": "^24.6.4",
-    "electron-rebuild": "^3.2.9",
-    "esbuild": "^0.27.0",
-    "esbuild-plugin-copy": "^2.1.1",
     "jest": "^29.7.0",
     "rimraf": "^5.0.10",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.3.2"
-  },
-  "dependencies": {
-    "@types/fluent-ffmpeg": "^2.1.24",
-    "fluent-ffmpeg": "^2.1.2",
-    "sqlite3": "^5.1.6"
-  },
-  "build": {
-    "appId": "com.corey.miniubrowser",
-    "productName": "MiniUBrowser",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "node_modules/**/*"
-    ],
-    "mac": {
-      "category": "public.app-category.utilities",
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "icon": "assert/icon.png",
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ],
-      "icon": "assert/icon.png"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "assert/icon.png"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assert/icon.png"
-    }
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
   }
 }

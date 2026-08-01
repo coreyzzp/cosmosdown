@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MiniUBrowser - 音频文件转换器</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
     <div id="app">
@@ -60,13 +60,13 @@
                     </div>
                     <button id="refreshBtn" class="btn btn-secondary" disabled>刷新列表</button>
                 </div>
-                
+
                 <!-- 搜索过滤 -->
                 <div class="filter-bar">
                     <input type="text" id="filterInput" placeholder="🔍 搜索标题、播客名称或作者..." disabled>
                     <button id="clearFilterBtn" class="btn btn-secondary" disabled>清除</button>
                 </div>
-                
+
                 <!-- 下载状态过滤 -->
                 <div class="download-filter-bar">
                     <span class="filter-label">下载状态:</span>
@@ -74,7 +74,7 @@
                     <button id="downloadFilterDownloaded" class="btn btn-filter" disabled>已下载</button>
                     <button id="downloadFilterNotDownloaded" class="btn btn-filter" disabled>未下载</button>
                 </div>
-                
+
                 <div id="filesList" class="files-list">
                     <div class="empty-state">
                         <p>请先连接数据库以查看音频文件</p>
@@ -86,7 +86,7 @@
                     <button id="startConversionBtn" class="btn btn-success" disabled>开始转换</button>
                 </div>
             </section>
-            
+
             <!-- 详情面板 -->
             <div id="detailsPanel" class="details-panel" style="display: none;">
                 <div class="details-overlay"></div>
@@ -118,6 +118,6 @@
         </main>
     </div>
 
-    <script src="renderer.js"></script>
+    <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

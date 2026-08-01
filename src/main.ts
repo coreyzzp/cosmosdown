@@ -1,4 +1,5 @@
-import { MainToRendererMessage, RendererToMainMessage } from '../types';
+import { appAPI } from './api/bridge';
+import { MainToRendererMessage, RendererToMainMessage } from './types';
 
 class RendererApp {
   private selectedFiles: Set<string> = new Set();
@@ -145,7 +146,7 @@ class RendererApp {
     // 选择数据库按钮
     const selectDbBtn = document.getElementById('selectDbBtn') as HTMLButtonElement;
     selectDbBtn.addEventListener('click', async () => {
-      const result = await window.electronAPI.selectDatabase();
+      const result = await appAPI.selectDatabase();
       if (result.success && result.path) {
         const dbPathInput = document.getElementById('dbPath') as HTMLInputElement;
         dbPathInput.value = result.path;
@@ -175,7 +176,7 @@ class RendererApp {
           payload: { path: dbPath }
         };
 
-        const result = await window.electronAPI.sendMessage(message);
+        const result = await appAPI.sendMessage(message);
         if (result.success) {
           this.isConnected = true;
           this.updateConnectionStatus(true, dbPath);
@@ -197,7 +198,7 @@ class RendererApp {
     // 选择输出目录按钮
     const selectOutputBtn = document.getElementById('selectOutputBtn') as HTMLButtonElement;
     selectOutputBtn.addEventListener('click', async () => {
-      const result = await window.electronAPI.selectFolder();
+      const result = await appAPI.selectFolder();
       if (result.success && result.path) {
         const outputPathInput = document.getElementById('outputPath') as HTMLInputElement;
         outputPathInput.value = result.path;
@@ -254,7 +255,7 @@ class RendererApp {
   }
 
   private setupIPCListeners(): void {
-    window.electronAPI.onMessage((message: MainToRendererMessage) => {
+    void appAPI.onMessage((message: MainToRendererMessage) => {
       switch (message.type) {
         case 'database-connected':
           if (message.payload.autoConnected) {
@@ -306,7 +307,7 @@ class RendererApp {
         payload: {}
       };
 
-      const result = await window.electronAPI.sendMessage(message);
+      const result = await appAPI.sendMessage(message);
       if (result.success) {
         this.audioFiles = result.files;
         this.applyFilter(); // 应用过滤
@@ -854,7 +855,7 @@ class RendererApp {
         }
       };
 
-      const result = await window.electronAPI.sendMessage(message);
+      const result = await appAPI.sendMessage(message);
       if (result.success) {
         this.log(`批量转换任务已启动，共 ${result.converted} 个文件`, 'success');
       } else {
@@ -976,7 +977,7 @@ class RendererApp {
         }
       };
 
-      const result = await window.electronAPI.sendMessage(message);
+      const result = await appAPI.sendMessage(message);
       if (result.success) {
         this.updateConversionTask(fileId, 'converting', 0);
       } else {
@@ -1146,7 +1147,7 @@ class RendererApp {
     };
 
     try {
-      await window.electronAPI.sendMessage(message);
+      await appAPI.sendMessage(message);
       this.log(`音频质量已设置为: ${audioQuality}`, 'info');
     } catch (error: any) {
       this.log(`设置配置失败: ${error.message}`, 'error');
