@@ -41,6 +41,13 @@
     "fluent-ffmpeg": "^2.1.2",
     "sqlite3": "^5.1.6"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "sqlite3"
+    ]
+  },
   "build": {
     "appId": "com.corey.miniubrowser",
     "productName": "MiniUBrowser",
