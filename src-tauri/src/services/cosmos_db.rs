@@ -123,7 +123,8 @@ impl CosmosDbService {
                     description: row.get(3)?,
                     image: row.get(4)?,
                     duration,
-                    pub_date: row.get(6)?,
+                    // pubDate 在小宇宙库中以 REAL（秒级浮点）存储，按 f64 读取后转 i64
+                    pub_date: row.get::<_, Option<f64>>(6)?.map(|v| v as i64),
                     play_count: row.get::<_, Option<i64>>(7)?.unwrap_or(0),
                     comment_count: row.get::<_, Option<i64>>(8)?.unwrap_or(0),
                     is_favorited: row.get::<_, Option<i64>>(9)?.unwrap_or(0) == 1,
@@ -145,7 +146,8 @@ impl CosmosDbService {
                     local_file_format,
                     progress: progress_val,
                     progress_percent,
-                    last_played: row.get(24)?,
+                    // playedAt 同样以 REAL（秒级浮点）存储
+                    last_played: row.get::<_, Option<f64>>(24)?.map(|v| v as i64),
                 })
             })
             .map_err(|e| format!("查询失败: {}", e))?;
