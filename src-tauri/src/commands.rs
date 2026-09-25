@@ -239,10 +239,11 @@ pub async fn batch_conversion(
 }
 
 /// 选择输出目录。
-/// 注意：必须是同步命令——blocking_pick_folder 会阻塞当前线程，
-/// 放在 async command 里会阻塞 tokio worker，存在死锁风险。
+/// 必须是 async 命令：sync command 在主线程执行（macOS WKWebView IPC 回调在主线程），
+/// 而 blocking_pick_folder 会阻塞当前线程等待主线程事件循环驱动模态对话框——
+/// 主线程自等自己即死锁。async 命令跑在 tokio worker 线程上，等待期间主线程空闲。
 #[tauri::command]
-pub fn select_folder(app: AppHandle) -> Result<Option<String>, String> {
+pub async fn select_folder(app: AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
     let path = app
@@ -253,9 +254,9 @@ pub fn select_folder(app: AppHandle) -> Result<Option<String>, String> {
     Ok(path.map(|p| p.to_string()))
 }
 
-/// 选择数据库文件（同上，同步命令 + blocking picker）
+/// 选择数据库文件（同上，必须是 async 命令 + blocking picker）
 #[tauri::command]
-pub fn select_database(app: AppHandle) -> Result<Option<String>, String> {
+pub async fn select_database(app: AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
     let path = app
