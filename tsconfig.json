@@ -23,7 +23,7 @@
     "isolatedModules": true
   },
   "include": [
-    "src/renderer/**/*"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",

@@ -110,12 +110,8 @@ impl AudioProcessor {
             .collect::<Vec<&str>>()
             .join("_");
 
-        // 限制长度
-        if sanitized.len() > 200 {
-            sanitized[..200].to_string()
-        } else {
-            sanitized
-        }
+        // 限制长度：按字符截断，避免字节边界切断多字节字符导致 panic
+        sanitized.chars().take(200).collect()
     }
 }
 

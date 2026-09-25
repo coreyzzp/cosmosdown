@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniUBrowser</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div id="app">
+        <header class="topbar">
+            <div class="brand">
+                <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 12h2m3-4v8m3-11v14m3-11v8m3-4h2"/>
+                </svg>
+                <span class="brand-name">MiniUBrowser</span>
+                <span class="brand-sub">小宇宙音频导出</span>
+            </div>
+            <div class="conn" id="connPill">
+                <span class="conn-dot" id="connDot"></span>
+                <span class="conn-text" id="connText">未连接</span>
+            </div>
+        </header>
+
+        <main class="content">
+            <!-- 数据源与输出设置 -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>数据源与输出</h2>
+                </div>
+                <div class="path-rows">
+                    <div class="path-row">
+                        <label class="path-label" for="dbPath">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>
+                            <span>数据库</span>
+                        </label>
+                        <div class="path-input">
+                            <input type="text" id="dbPath" placeholder="选择小宇宙 cosmos.db，留空则自动检测…" spellcheck="false" autocomplete="off">
+                        </div>
+                        <button id="selectDbBtn" class="btn btn-ghost">浏览</button>
+                        <button id="connectBtn" class="btn btn-primary" disabled>连接</button>
+                    </div>
+                    <div class="path-row">
+                        <label class="path-label" for="outputPath">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                            <span>输出目录</span>
+                        </label>
+                        <div class="path-input">
+                            <input type="text" id="outputPath" placeholder="选择 MP3 输出目录…" spellcheck="false" autocomplete="off">
+                        </div>
+                        <button id="selectOutputBtn" class="btn btn-ghost">浏览</button>
+                        <div class="quality-field">
+                            <label class="quality-label" for="audioQuality">音质</label>
+                            <select id="audioQuality">
+                                <option value="low">128 kbps</option>
+                                <option value="medium" selected>192 kbps</option>
+                                <option value="high">320 kbps</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 单集列表 -->
+            <section class="card">
+                <div class="list-toolbar">
+                    <div class="search-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                        <input type="text" id="filterInput" placeholder="搜索标题、播客或作者…" spellcheck="false" disabled>
+                    </div>
+                    <div class="seg" role="group" aria-label="下载状态过滤">
+                        <button id="downloadFilterAll" class="seg-btn active" disabled>全部</button>
+                        <button id="downloadFilterDownloaded" class="seg-btn" disabled>已下载</button>
+                        <button id="downloadFilterNotDownloaded" class="seg-btn" disabled>未下载</button>
+                    </div>
+                    <div class="sort-group" role="group" aria-label="排序">
+                        <button id="sortByTitle" class="sort-btn">标题</button>
+                        <button id="sortByDate" class="sort-btn active desc">日期</button>
+                        <button id="sortByPlay" class="sort-btn">播放</button>
+                        <button id="sortByDuration" class="sort-btn">时长</button>
+                    </div>
+                    <div class="list-meta" id="fileStatsBadge">0 个单集</div>
+                    <button id="refreshBtn" class="icon-btn" title="刷新列表" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+                    </button>
+                </div>
+
+                <div id="filesList" class="files-list">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>
+                        <p>连接数据库后加载单集列表</p>
+                    </div>
+                </div>
+
+                <div class="list-footer">
+                    <span id="selectionHint" class="selection-hint"></span>
+                    <div class="list-footer-actions">
+                        <button id="selectAllBtn" class="btn btn-ghost" disabled>全选</button>
+                        <button id="deselectAllBtn" class="btn btn-ghost" disabled>取消全选</button>
+                        <button id="startConversionBtn" class="btn btn-primary" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+                            <span>开始转换</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 转换任务 -->
+            <section class="card progress-section" id="progressSection" style="display: none;">
+                <div class="card-head">
+                    <h2>转换任务</h2>
+                    <button id="clearFinishedBtn" class="btn btn-ghost">清除已结束</button>
+                </div>
+                <div id="conversionList" class="task-list"></div>
+            </section>
+
+            <!-- 运行日志 -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>运行日志</h2>
+                    <button id="clearLogBtn" class="btn btn-ghost">清空</button>
+                </div>
+                <div id="logContainer" class="log-container"></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 单集详情 -->
+    <div id="detailsPanel" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-panel">
+            <button class="modal-close icon-btn" id="closeDetailsBtn" title="关闭">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+            <div class="details-body"></div>
+        </div>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+</body>
+</html>

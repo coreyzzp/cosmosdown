@@ -26,19 +26,19 @@
 
 ```
 miniubrowser/
-├── index.html                 # Vite 入口
-├── src/                       # 前端
-│   ├── main.ts                # UI 逻辑（原 renderer）
+├── src/                       # 前端（Vite root）
+│   ├── index.html             # Vite 入口
+│   ├── main.ts                # 应用控制器（状态 / 事件 / invoke）
+│   ├── ui.ts                  # 模板渲染纯函数
+│   ├── format.ts              # 格式化 / 转义纯函数
+│   ├── types/                 # 前后端契约类型
 │   ├── api/bridge.ts          # invoke / event 桥（替代 preload）
-│   ├── styles.css
-│   └── types/
+│   └── styles.css
 ├── src-tauri/                 # Rust 后端
 │   ├── src/
-│   │   ├── commands/          # 对应原 Electron IPC
-│   │   ├── services/          # Cosmos / FFmpeg / 小宇宙检测
-│   │   ├── models.rs
-│   │   ├── state.rs
-│   │   └── lib.rs
+│   │   ├── main.rs            # Tauri 入口（注册 commands 与插件）
+│   │   ├── commands.rs        # 对应原 Electron IPC，推送转换进度事件
+│   │   └── services/          # Cosmos / FFmpeg / 小宇宙检测 / AppState
 │   ├── capabilities/
 │   └── tauri.conf.json
 └── _legacy/electron/          # 旧 Electron 实现（迁移对照）
@@ -47,7 +47,7 @@ miniubrowser/
 **通信模型**
 
 - 前端 `invoke('open_database' | 'get_files' | ...)` → Rust commands
-- Rust `emit('app-message', ...)` → 前端进度/自动连接事件
+- Rust `emit('app-message', ...)` → 前端进度 / 连接事件（`database-connected`、`batch-started`、`task-started`、`task-completed`、`task-failed`，负载带 `type` 字段）
 
 ## 系统要求
 

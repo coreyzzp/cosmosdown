@@ -3,13 +3,13 @@ import { resolve } from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  root: 'src/renderer',
+  root: 'src',
   base: './',
   build: {
-    outDir: '../../dist',
+    outDir: '../dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve(__dirname, 'src/renderer/index.html'),
+      input: resolve(__dirname, 'src/index.html'),
     },
   },
   server: {

@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/tauri-conf-schema.json",
   "productName": "MiniUBrowser",
   "version": "1.0.0",
   "identifier": "com.corey.miniubrowser",
@@ -12,9 +11,11 @@
   "app": {
     "windows": [
       {
-        "title": "MiniUBrowser - 音频文件转换器",
-        "width": 1200,
+        "title": "MiniUBrowser - 小宇宙音频导出",
+        "width": 1180,
         "height": 800,
+        "minWidth": 860,
+        "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
         "decorations": true
@@ -34,11 +35,5 @@
       "icons/icon.icns",
       "icons/icon.png"
     ]
-  },
-  "plugins": {
-    "dialog": null,
-    "shell": {
-      "open": true
-    }
   }
 }

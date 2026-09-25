@@ -2,14 +2,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { MainToRendererMessage, RendererToMainMessage } from '../types';
 
-export type PathPickerResult = { success: boolean; path?: string };
-
 /**
  * Frontend bridge that replaces the old Electron preload API.
  * Backend commands live in src-tauri; progress events use the `app-message` channel.
+ * 所有选择器命令直接返回 `string | null`（与 Rust `Option<String>` 对应）。
  */
 export const appAPI = {
-  async sendMessage(message: RendererToMainMessage): Promise<any> {
+  async sendMessage(message: RendererToMainMessage): Promise<unknown> {
     switch (message.type) {
       case 'open-database':
         return invoke('open_database', { path: message.payload.path });
@@ -26,13 +25,16 @@ export const appAPI = {
           outputDir: message.payload.outputDir,
         });
       case 'set-config':
-        return invoke('set_config', { config: message.payload });
+        return invoke('set_config', {
+          audioQuality: message.payload.audioQuality,
+          maxConcurrentTasks: message.payload.maxConcurrentTasks,
+        });
       default:
         throw new Error(`Unknown message type: ${(message as { type: string }).type}`);
     }
   },
 
-  onMessage(callback: (message: MainToRendererMessage) => void): UnlistenFn | Promise<UnlistenFn> {
+  onMessage(callback: (message: MainToRendererMessage) => void): Promise<UnlistenFn> {
     return listen<MainToRendererMessage>('app-message', (event) => {
       callback(event.payload);
     });
@@ -44,11 +46,11 @@ export const appAPI = {
     }
   },
 
-  selectFolder(): Promise<PathPickerResult> {
+  selectFolder(): Promise<string | null> {
     return invoke('select_folder');
   },
 
-  selectDatabase(): Promise<PathPickerResult> {
+  selectDatabase(): Promise<string | null> {
     return invoke('select_database');
   },
 
