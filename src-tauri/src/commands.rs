@@ -117,7 +117,20 @@ pub async fn start_conversion(
         json!({ "type": "task-started", "taskId": file_id, "title": title }),
     );
 
-    match AudioProcessor::convert_to_mp3(&local_path, &output_path_str, &config, Some(&metadata)) {
+    let on_progress = |percent: u8| {
+        emit_message(
+            &app,
+            json!({ "type": "task-progress", "taskId": file_id, "percent": percent }),
+        );
+    };
+    match AudioProcessor::convert_to_mp3(
+        &local_path,
+        &output_path_str,
+        &config,
+        Some(&metadata),
+        file.duration,
+        Some(&on_progress),
+    ) {
         Ok(()) => {
             emit_message(
                 &app,
@@ -210,7 +223,21 @@ pub async fn batch_conversion(
             json!({ "type": "task-started", "taskId": file.id, "title": title }),
         );
 
-        match AudioProcessor::convert_to_mp3(&local_path, &output_path_str, &config, Some(&metadata)) {
+        let task_id = file.id.clone();
+        let on_progress = |percent: u8| {
+            emit_message(
+                &app,
+                json!({ "type": "task-progress", "taskId": task_id, "percent": percent }),
+            );
+        };
+        match AudioProcessor::convert_to_mp3(
+            &local_path,
+            &output_path_str,
+            &config,
+            Some(&metadata),
+            file.duration,
+            Some(&on_progress),
+        ) {
             Ok(()) => {
                 emit_message(
                     &app,

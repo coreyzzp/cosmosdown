@@ -549,6 +549,13 @@ body {
     animation: task-indeterminate 1.2s ease-in-out infinite;
 }
 
+/* determinate：收到 task-progress 后由内联 width 驱动（百分比），禁用循环动画避免闪烁 */
+.task-row.status-converting .task-progress-fill.determinate {
+    width: 0%;
+    animation: none;
+    transition: width .25s ease;
+}
+
 @keyframes task-indeterminate {
     0% { margin-left: -40%; }
     100% { margin-left: 100%; }

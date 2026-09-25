@@ -1,6 +1,7 @@
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use super::AppConfig;
 
@@ -36,12 +37,18 @@ impl AudioProcessor {
         None
     }
 
-    /// 转换音频文件为 MP3
+    /// 转换音频文件为 MP3。
+    ///
+    /// `total_duration_secs`：音频总时长（数据库记录，秒）。提供且 > 0 时，
+    /// 通过 ffmpeg `-progress pipe:1` 输出计算完成百分比并调用 `on_progress`（0-100）。
+    /// 回调仅在百分比增长时触发（整数百分比，单文件至多 100 次）。
     pub fn convert_to_mp3(
         source_path: &str,
         output_path: &str,
         config: &AppConfig,
         metadata: Option<&AudioMetadata>,
+        total_duration_secs: Option<f64>,
+        on_progress: Option<&dyn Fn(u8)>,
     ) -> Result<(), String> {
         let ffmpeg_path = Self::find_ffmpeg()
             .ok_or_else(|| "未找到 FFmpeg，请确保系统中已安装 FFmpeg".to_string())?;
@@ -61,6 +68,12 @@ impl AudioProcessor {
 
         let mut cmd = Command::new(&ffmpeg_path);
         cmd.arg("-y") // 覆盖已有文件
+            // 进度输出到 stdout（key=value，每 0.5s 一组），stderr 只留错误信息
+            .arg("-progress")
+            .arg("pipe:1")
+            .arg("-nostats")
+            .arg("-loglevel")
+            .arg("error")
             .arg("-i")
             .arg(source_path)
             .arg("-ab")
@@ -86,13 +99,58 @@ impl AudioProcessor {
             }
         }
 
-        cmd.arg(output_path);
+        cmd.arg(output_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
-        let output = cmd.output().map_err(|e| format!("执行 FFmpeg 失败: {}", e))?;
+        let mut child = cmd.spawn().map_err(|e| format!("执行 FFmpeg 失败: {}", e))?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("FFmpeg 转换失败: {}", stderr));
+        // stderr 用单独线程持续排空，防止管道缓冲写满导致 ffmpeg 阻塞
+        let stderr_handle = child.stderr.take();
+        let stderr_thread = std::thread::spawn(move || {
+            let mut buf = String::new();
+            if let Some(mut err) = stderr_handle {
+                let _ = std::io::Read::read_to_string(&mut err, &mut buf);
+            }
+            buf
+        });
+
+        let mut last_percent: u8 = 0;
+        if let Some(stdout) = child.stdout.take() {
+            // 行格式示例：out_time_us=123456789（微秒；开头可能是 N/A）
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                let Some(us) = line.strip_prefix("out_time_us=") else {
+                    continue;
+                };
+                let Ok(us) = us.trim().parse::<f64>() else {
+                    continue;
+                };
+                let (Some(cb), Some(total)) = (on_progress, total_duration_secs) else {
+                    continue;
+                };
+                if total <= 0.0 {
+                    continue;
+                }
+                let percent = ((us / 1_000_000.0) / total * 100.0).clamp(0.0, 100.0) as u8;
+                if percent > last_percent {
+                    last_percent = percent;
+                    cb(percent);
+                }
+            }
+        }
+
+        let stderr = stderr_thread.join().unwrap_or_default();
+        let status = child
+            .wait()
+            .map_err(|e| format!("等待 FFmpeg 失败: {}", e))?;
+
+        if !status.success() {
+            let stderr = stderr.trim();
+            return Err(if stderr.is_empty() {
+                "FFmpeg 转换失败（无错误输出）".to_string()
+            } else {
+                format!("FFmpeg 转换失败: {}", stderr)
+            });
         }
 
         Ok(())

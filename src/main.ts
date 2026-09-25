@@ -212,7 +212,14 @@ class RendererApp {
         this.showProgressSection(true);
         return;
       case 'task-started':
-        this.updateTask(msg.taskId, { status: 'converting', title: msg.title });
+        this.updateTask(msg.taskId, {
+          status: 'converting',
+          title: msg.title,
+          percent: undefined,
+        });
+        return;
+      case 'task-progress':
+        this.updateTaskProgress(msg.taskId, msg.percent);
         return;
       case 'task-completed':
         this.updateTask(msg.taskId, { status: 'completed', outputPath: msg.outputPath });
@@ -517,7 +524,7 @@ class RendererApp {
 
     this.saveLastOutputPath(outputPath);
     this.ensureTask(fileId, file.title);
-    this.updateTask(fileId, { status: 'converting' });
+    this.updateTask(fileId, { status: 'converting', percent: undefined });
     this.showProgressSection(true);
     this.log(`开始转换: ${file.title ?? fileId}`);
 
@@ -544,6 +551,29 @@ class RendererApp {
     if (!task) return;
     Object.assign(task, patch);
     this.renderConversionList();
+  }
+
+  /**
+   * task-progress 事件的专用更新路径：仅修改对应任务行内的进度条宽度与状态文本，
+   * 不触发 renderConversionList 全量重建——批量转换期间进度事件频繁（约每 0.5s 一条），
+   * 全量 innerHTML 重建会重置所有行内 CSS 动画/过渡，表现为界面闪烁。
+   */
+  private updateTaskProgress(taskId: string, percent: number): void {
+    const task = this.conversionTasks.get(taskId);
+    if (!task) return;
+    task.percent = percent;
+
+    const row = $('conversionList').querySelector<HTMLElement>(
+      `[data-task-row-id="${CSS.escape(taskId)}"]`
+    );
+    if (!row) return;
+    const fill = row.querySelector<HTMLElement>('.task-progress-fill');
+    if (fill) {
+      fill.classList.add('determinate');
+      fill.style.width = `${percent}%`;
+    }
+    const state = row.querySelector<HTMLElement>('.task-state');
+    if (state) state.textContent = `转换中 ${percent}%`;
   }
 
   private removeTask(taskId: string): void {

@@ -19,6 +19,8 @@ export interface ConversionTask {
   id: string;
   title: string;
   status: 'pending' | 'converting' | 'completed' | 'failed';
+  /** converting 期间由 task-progress 事件维护的整数百分比（0-100）。终态时保留最后值。 */
+  percent?: number;
   outputPath?: string;
   error?: string;
 }
@@ -81,7 +83,8 @@ export function renderEpisodeRow(file: EpisodeInfo, checked: boolean): string {
   </div>`;
 }
 
-/** 转换任务行。converting 状态展示 indeterminate 进度条（由 CSS 动画驱动）。 */
+/** 转换任务行。converting 且已有百分比时展示 determinate 进度条（width 驱动），
+ *  未收到 task-progress（如时长未知）时回退 indeterminate 循环动画。 */
 export function renderTaskRow(task: ConversionTask): string {
   const statusText: Record<ConversionTask['status'], string> = {
     pending: '等待中',
@@ -90,6 +93,13 @@ export function renderTaskRow(task: ConversionTask): string {
     failed: '失败',
   };
   const ended = task.status === 'completed' || task.status === 'failed';
+  const percent =
+    task.status === 'converting' && task.percent != null ? task.percent : null;
+  const stateText = percent != null ? `转换中 ${percent}%` : statusText[task.status];
+  const fill =
+    percent != null
+      ? `<div class="task-progress-fill determinate" style="width: ${percent}%"></div>`
+      : '<div class="task-progress-fill"></div>';
   const detail =
     task.status === 'completed' && task.outputPath
       ? `<div class="task-output">${escapeHtml(task.outputPath)}</div>`
@@ -98,14 +108,14 @@ export function renderTaskRow(task: ConversionTask): string {
         : '';
 
   return `
-  <div class="task-row status-${task.status}">
+  <div class="task-row status-${task.status}" data-task-row-id="${escapeAttr(task.id)}">
     <span class="task-dot"></span>
     <div class="task-main">
       <div class="task-title">${escapeHtml(task.title || task.id)}</div>
       ${detail}
-      <div class="task-progress"><div class="task-progress-fill"></div></div>
+      <div class="task-progress">${fill}</div>
     </div>
-    <span class="task-state">${statusText[task.status]}</span>
+    <span class="task-state">${stateText}</span>
     ${ended ? `<button class="icon-btn" data-task-id="${escapeAttr(task.id)}" title="移除记录">${ICON_TRASH}</button>` : ''}
   </div>`;
 }

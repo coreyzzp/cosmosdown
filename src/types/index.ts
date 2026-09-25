@@ -59,6 +59,7 @@ export type MainToRendererMessage =
   | { type: 'database-connected'; path: string; autoConnected?: boolean }
   | { type: 'batch-started'; total: number }
   | { type: 'task-started'; taskId: string; title?: string }
+  | { type: 'task-progress'; taskId: string; percent: number }
   | { type: 'task-completed'; taskId: string; outputPath: string }
   | { type: 'task-failed'; taskId: string; error: string };
 
